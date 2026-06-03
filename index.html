@@ -681,7 +681,8 @@ function printLabels(){
     // [T-013 fix2] margin=24 → quiet zone ขอบขาว (Code128 บังคับ ≥10×แท่ง) ให้เครื่องสแกนหาจุดเริ่มเจอ
     JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:24, height:70, width:2});
     // viewBox + ไม่ตั้ง preserveAspectRatio (default = รักษาสัดส่วน ไม่บิดแท่ง ไม่ยืด)
-    const bw=svg.getAttribute('width'), bh=svg.getAttribute('height');
+    // ⚠️ getAttribute คืน "404px" (มี px) → ต้อง parseFloat ไม่งั้น viewBox ผิดสเปก เบราว์เซอร์เมิน
+    const bw=parseFloat(svg.getAttribute('width')), bh=parseFloat(svg.getAttribute('height'));
     svg.setAttribute('viewBox','0 0 '+bw+' '+bh);
     svg.removeAttribute('width'); svg.removeAttribute('height');
     const svgHtml=new XMLSerializer().serializeToString(svg);
