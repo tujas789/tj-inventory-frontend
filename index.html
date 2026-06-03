@@ -678,12 +678,11 @@ function printLabels(){
   let body='';
   lastReceive.unit_barcodes.forEach(code=>{
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, height:90, width:2});
-    // [T-013 fix] ตั้ง viewBox จากขนาดธรรมชาติก่อนยืด → สเกลแกน X เท่ากันทุกแท่ง
-    // (สัดส่วนแท่งคงที่ ไม่บิด/ไม่ตัดขอบ → เครื่องยิง/กล้องอ่านได้ครบทั้งค่า)
+    // [T-013 fix2] margin=24 → quiet zone ขอบขาว (Code128 บังคับ ≥10×แท่ง) ให้เครื่องสแกนหาจุดเริ่มเจอ
+    JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:24, height:70, width:2});
+    // viewBox + ไม่ตั้ง preserveAspectRatio (default = รักษาสัดส่วน ไม่บิดแท่ง ไม่ยืด)
     const bw=svg.getAttribute('width'), bh=svg.getAttribute('height');
     svg.setAttribute('viewBox','0 0 '+bw+' '+bh);
-    svg.setAttribute('preserveAspectRatio','none');   // ยืดเต็มกว้างฉลาก ไม่มีขอบข้าง
     svg.removeAttribute('width'); svg.removeAttribute('height');
     const svgHtml=new XMLSerializer().serializeToString(svg);
     body +=
@@ -704,8 +703,8 @@ function printLabels(){
     '.lb-top{display:flex;align-items:baseline;justify-content:space-between;gap:2mm;}'+
     '.lb-name{font-size:8.5pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}'+
     '.lb-exp{font-size:7pt;font-weight:700;white-space:nowrap;flex-shrink:0;}'+
-    '.lb-bc{width:100%;height:11mm;}'+
-    '.lb-bc svg{width:100%;height:100%;display:block;}'+
+    '.lb-bc{width:100%;text-align:center;}'+
+    '.lb-bc svg{width:100%;height:auto;max-height:13mm;display:block;}'+
     '.lb-code{font-size:7pt;letter-spacing:1px;font-family:"Courier New",monospace;'+
       'font-weight:700;text-align:center;white-space:nowrap;}'+
     '</style></head><body>'+body+'</body></html>';
