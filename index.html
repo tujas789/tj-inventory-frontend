@@ -519,7 +519,13 @@ function toggleCam(){
     camCfg.formatsToSupport=[Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128];
   }
   cam=new Html5Qrcode('reader', camCfg);
-  cam.start({facingMode:'environment'},{fps:10,qrbox:{width:280,height:140},aspectRatio:1.4},
+  // [T-015] iPhone (iOS Safari ไม่มี BarcodeDetector → ตก ZXing) อ่าน QR ติด:
+  //   (1) ขอวิดีโอความละเอียดสูง (1920) + โฟกัสต่อเนื่อง → ภาพคม โฟกัส QR ระยะใกล้ได้
+  //   (2) qrbox เป็น "จัตุรัส" ตามรูปทรง QR (เดิมเป็นผืนผ้า 280×140 ไม่พอดี) + ปรับตามขนาดจอ
+  const videoConstraints={ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080},
+                           advanced:[{focusMode:'continuous'}] };
+  const qrboxFn=(vw,vh)=>{ const m=Math.floor(Math.min(vw,vh)*0.72); return {width:m,height:m}; };
+  cam.start(videoConstraints,{fps:12,qrbox:qrboxFn},
     txt=>{
       // [T-013] สแกน→ใส่กล่อง→กดยืนยัน (ไม่ตัดทันที กันยิงผิดตัด)
       const code=normalizeBarcode(txt);   // [T-015] ดึงเฉพาะตัวเลข กันขยะจากการสแกน
@@ -678,68 +684,88 @@ function fmtExpiry(d){
   if(p.length!==3) return d||'';
   return p[2]+'/'+p[1]+'/'+p[0].slice(2);
 }
+/* ===== เทมเพลตฉลาก (T-008 / T-015) — เลย์เอาต์ใหม่ ใช้ร่วมทั้งพิมพ์จริง + พรีวิว =====
+   layout: แถวบน = [ QR ใหญ่ ~15mm (พระเอก) | ชื่อสินค้า 2 บรรทัด + กล่อง EXP ]
+           แถวล่าง = Code128 เต็มความกว้าง (แท่งอ้วน) + เลข human-readable ใต้แท่ง
+   เหตุผลที่จัดแบบนี้:
+     • QR ใหญ่ขึ้นจาก 9mm → 15mm (โมดูลใหญ่ขึ้น ~2 เท่า) + ECC=H + quiet zone 4 โมดูล
+       → กล้อง iPhone (ZXing) โฟกัสติด อ่านชัวร์ขึ้นมาก
+     • Code128 กินเต็ม 50mm + preserveAspectRatio=none → แท่งอ้วนเต็มที่ ไม่ผอม เครื่องยิง 1D อ่านง่าย
+     • ชื่อสินค้า clamp 2 บรรทัด (เลิกตัด "..." กลางคำ) ; EXP อยู่ในกล่องเส้นขอบ เด่น อ่านง่าย */
+const LABEL_CSS=[
+  '@page{size:50mm 25mm;margin:0;}',
+  '*{margin:0;padding:0;box-sizing:border-box;}',
+  'html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
+  // [T-015] label 24mm < หน้า 25mm = เผื่อ slack 1mm กัน rounding ดันหน้าว่าง (บทเรียน JOURNAL bug #2)
+  '.label{width:50mm;height:24mm;padding:0.7mm 1.5mm;display:flex;flex-direction:column;',
+    'overflow:hidden;color:#000;background:#fff;',
+    'font-family:"IBM Plex Sans Thai","IBM Plex Sans","Segoe UI",Tahoma,sans-serif;}',
+  '.label+.label{page-break-before:always;}',
+  '.lb-head{display:flex;gap:1.6mm;flex:1;min-height:0;align-items:center;}',
+  '.lb-qr{flex:0 0 14mm;width:14mm;height:14mm;}',
+  '.lb-qr svg{width:100%;height:100%;display:block;}',
+  '.lb-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1mm;}',
+  '.lb-name{font-size:8pt;font-weight:700;line-height:1.12;display:-webkit-box;',
+    '-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}',
+  '.lb-exp{align-self:flex-start;font-size:7.5pt;font-weight:700;line-height:1;white-space:nowrap;',
+    'border:0.3mm solid #000;border-radius:1mm;padding:0.5mm 1.4mm;}',
+  '.lb-bc{width:100%;height:5mm;}',
+  '.lb-bc svg{width:100%;height:100%;display:block;}',
+  '.lb-code{font-family:"IBM Plex Mono","Courier New",monospace;font-size:7.5pt;font-weight:700;',
+    'text-align:center;letter-spacing:2px;white-space:nowrap;line-height:1;margin-top:0.6mm;}'
+].join('');
+
+// สร้าง .label หนึ่งใบ — item = {name, exp (ข้อความเต็มเช่น "EXP 04/06/69" หรือ ''), code}
+function buildLabelItem(item){
+  const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  // Code128 — เต็มความกว้าง แท่งอ้วน ; margin 20 (=10 โมดูล) = quiet zone ครบสเปก
+  // preserveAspectRatio=none → ยืดเต็ม 100% × ความสูงคงที่ (ไม่ letterbox จนแท่งแคบ)
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  JsBarcode(svg, item.code, {format:'CODE128', displayValue:false, margin:20, height:60, width:2});
+  // ⚠️ getAttribute คืน "404px" (มี px) → parseFloat ก่อน ไม่งั้น viewBox ผิดสเปก
+  const bw=parseFloat(svg.getAttribute('width')), bh=parseFloat(svg.getAttribute('height'));
+  svg.setAttribute('viewBox','0 0 '+bw+' '+bh);
+  svg.setAttribute('preserveAspectRatio','none');
+  svg.removeAttribute('width'); svg.removeAttribute('height');
+  const bcHtml=new XMLSerializer().serializeToString(svg);
+  // QR — ค่าเดียวกับ Code128 ; ECC=H (กันเลอะ 30% ; 8 หลัก ยังเป็น version 1 = 21 โมดูล โมดูลใหญ่)
+  // margin 4 = quiet zone ตามสเปก QR (เดิม 2 → น้อยไป iPhone หาขอบไม่เจอ)
+  let qrHtml='';
+  if(typeof qrcode!=='undefined'){
+    const qr=qrcode(0,'H'); qr.addData(item.code); qr.make();
+    qrHtml=qr.createSvgTag({scalable:true, margin:4});
+  }
+  return '<div class="label">'+
+      '<div class="lb-head">'+
+        '<div class="lb-qr">'+qrHtml+'</div>'+
+        '<div class="lb-info">'+
+          '<div class="lb-name">'+esc(item.name)+'</div>'+
+          (item.exp?'<div class="lb-exp">'+esc(item.exp)+'</div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="lb-bc">'+bcHtml+'</div>'+
+      '<div class="lb-code">'+esc(item.code)+'</div>'+
+    '</div>';
+}
+function buildLabelBody(items){ return items.map(buildLabelItem).join(''); }
+function buildLabelDoc(items){
+  return '<!doctype html><html><head><meta charset="utf-8"><title>labels</title>'+
+    '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;700&family=IBM+Plex+Sans+Thai:wght@400;700&family=IBM+Plex+Mono:wght@700&display=swap" rel="stylesheet">'+
+    '<style>'+LABEL_CSS+'</style></head><body>'+buildLabelBody(items)+'</body></html>';
+}
+
 function printLabels(){
   if(!lastReceive || !lastReceive.unit_barcodes || !lastReceive.unit_barcodes.length){
     toast('ไม่มีฉลากให้พิมพ์',false); return;
   }
   if(typeof JsBarcode==='undefined'){ toast('โหลดตัวสร้าง barcode ไม่ได้ (เช็กเน็ต)',false); return; }
   // ── พิมพ์ผ่าน hidden iframe แล้วสั่ง frame.contentWindow.print() ────────────
-  // วิธีนี้พิสูจน์แล้วใน BactBud v6_6_2 ว่าพิมพ์ตรงแนวกับ Zebra (ไม่หมุน)
-  // เหตุผล: สั่ง print() บน iframe ที่เราคุมเอง → @page ของ iframe ถูกใช้จริง
-  //         (ต่างจาก window.open ที่เครื่องใช้ page default → หมุน 90°)
-  // กันหน้าว่างคั่น: ใช้ page-break-before เฉพาะ label ที่ 2 เป็นต้นไป (ไม่มี break ท้ายสุด)
-  const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  // สั่ง print() บน iframe ที่เราคุมเอง → @page ของ iframe ถูกใช้จริง (ไม่หมุน 90°)
   const expTxt = lastReceive.expiry ? ('EXP '+fmtExpiry(lastReceive.expiry)) : '';
-  const nameHtml = esc(lastReceive.product_name||'');
-  const expHtml = esc(expTxt);
-  const hasQr = typeof qrcode!=='undefined';   // [T-015] QR ให้กล้องมือถือ (iOS+Android) — ถ้า lib ไม่โหลด ข้าม QR พิมพ์ Code128 อย่างเดียวได้
-  let body='';
-  lastReceive.unit_barcodes.forEach(code=>{
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    // [T-013 fix2] margin=24 → quiet zone ขอบขาว (Code128 บังคับ ≥10×แท่ง) ให้เครื่องสแกนหาจุดเริ่มเจอ
-    JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:24, height:70, width:2});
-    // viewBox + ไม่ตั้ง preserveAspectRatio (default = รักษาสัดส่วน ไม่บิดแท่ง ไม่ยืด)
-    // ⚠️ getAttribute คืน "404px" (มี px) → ต้อง parseFloat ไม่งั้น viewBox ผิดสเปก เบราว์เซอร์เมิน
-    const bw=parseFloat(svg.getAttribute('width')), bh=parseFloat(svg.getAttribute('height'));
-    svg.setAttribute('viewBox','0 0 '+bw+' '+bh);
-    svg.removeAttribute('width'); svg.removeAttribute('height');
-    const svgHtml=new XMLSerializer().serializeToString(svg);
-    // [T-015] QR เก็บค่าเดียวกับ Code128 ; margin 2 module = quiet zone QR ; scalable → SVG ยืดตาม CSS
-    let qrHtml='';
-    if(hasQr){
-      const qr=qrcode(0,'M'); qr.addData(code); qr.make();
-      qrHtml=qr.createSvgTag({scalable:true, margin:2});
-    }
-    body +=
-      '<div class="label">'+
-        '<div class="lb-top"><span class="lb-name">'+nameHtml+'</span><span class="lb-exp">'+expHtml+'</span></div>'+
-        '<div class="lb-bc">'+svgHtml+'</div>'+
-        '<div class="lb-bot">'+
-          (hasQr?'<div class="lb-qr">'+qrHtml+'</div>':'')+
-          '<div class="lb-code">'+esc(code)+'</div>'+
-        '</div>'+
-      '</div>';
-  });
-  const doc='<!doctype html><html><head><meta charset="utf-8"><title>labels</title><style>'+
-    '@page{size:50mm 25mm;margin:0;}'+
-    '*{margin:0;padding:0;box-sizing:border-box;}'+
-    'html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'+
-    '.label{width:50mm;height:24mm;padding:1mm 2mm;display:flex;flex-direction:column;'+
-      'justify-content:space-between;overflow:hidden;color:#000;'+
-      'font-family:"Segoe UI",Tahoma,sans-serif;}'+
-    '.label+.label{page-break-before:always;}'+
-    '.lb-top{display:flex;align-items:baseline;justify-content:space-between;gap:2mm;}'+
-    '.lb-name{font-size:8.5pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}'+
-    '.lb-exp{font-size:7pt;font-weight:700;white-space:nowrap;flex-shrink:0;}'+
-    '.lb-bc{width:100%;text-align:center;}'+
-    '.lb-bc svg{width:100%;height:auto;max-height:9mm;display:block;}'+
-    // [T-015] แถวล่าง: QR (มุมซ้าย ให้กล้องมือถือ) + เลข human-readable
-    '.lb-bot{display:flex;align-items:center;gap:1.5mm;}'+
-    '.lb-qr{flex-shrink:0;width:9mm;height:9mm;}'+
-    '.lb-qr svg{width:100%;height:100%;display:block;}'+
-    '.lb-code{flex:1;min-width:0;font-size:8pt;letter-spacing:1px;font-family:"Courier New",monospace;'+
-      'font-weight:700;text-align:center;white-space:nowrap;}'+
-    '</style></head><body>'+body+'</body></html>';
+  const items = lastReceive.unit_barcodes.map(code=>({
+    name: lastReceive.product_name||'', exp: expTxt, code: code
+  }));
+  const doc = buildLabelDoc(items);
   let frame=document.getElementById('labelPrintFrame');
   if(!frame){
     frame=document.createElement('iframe');
@@ -750,11 +776,37 @@ function printLabels(){
   }
   const fdoc=frame.contentWindow.document;
   fdoc.open(); fdoc.write(doc); fdoc.close();
-  // รอ layout/วาด SVG เสร็จ แล้วสั่งพิมพ์จาก iframe โดยตรง
+  // รอ layout/วาด SVG + โหลดฟอนต์ แล้วสั่งพิมพ์จาก iframe โดยตรง
   setTimeout(function(){
     try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
     catch(e){ toast('พิมพ์ไม่สำเร็จ: '+e.message,false); }
-  },150);
+  },300);
+}
+
+/* ===== พรีวิวฉลากบนจอ (dev) — เปิด index.html?labelpreview=00000027,00000028 =====
+   ใช้เทมเพลตเดียวกับพิมพ์จริง (buildLabelBody) → ที่เห็นบนจอ = ที่พิมพ์ออกมาเป๊ะ */
+function initLabelPreview(){
+  const q=new URLSearchParams(location.search);
+  if(!q.has('labelpreview')) return false;
+  const raw=q.get('labelpreview');
+  const codes=(raw&&raw.trim())?raw.split(',').map(s=>s.trim()).filter(Boolean):['00000027'];
+  const name=q.get('name')||'On call Advance Cleaner Premium';
+  const expRaw=q.get('exp')||'2026-06-04';
+  const items=codes.map(c=>({name, exp:'EXP '+fmtExpiry(expRaw), code:c}));
+  $('login').classList.add('hidden'); $('app').classList.add('hidden');
+  const st=document.createElement('style');
+  st.textContent=LABEL_CSS+
+    ';.pv-page{padding:28px;background:#3a3f47;min-height:100vh;font-family:"IBM Plex Sans",sans-serif;color:#eaecef;}'+
+    '.pv-page h3{font-size:12px;font-weight:600;color:#9aa3ad;letter-spacing:.06em;text-transform:uppercase;margin:0 0 12px;}'+
+    '.pv-real .label{outline:1px solid #f6465d;margin-bottom:10px;}'+
+    '.pv-zoomwrap{zoom:8;width:max-content;}.pv-zoomwrap .label{outline:0.12mm solid #f6465d;margin-bottom:1.4mm;}';
+  document.head.appendChild(st);
+  const div=document.createElement('div');
+  div.className='pv-page';
+  div.innerHTML='<h3>Real size · 50 × 25 mm</h3><div class="pv-real">'+buildLabelBody(items)+'</div>'+
+    '<h3 style="margin-top:34px">Zoom × 8</h3><div class="pv-zoomwrap">'+buildLabelBody(items)+'</div>';
+  document.body.appendChild(div);
+  return true;
 }
 
 /* ===== ใกล้หมดอายุ (FEFO — T-009) ===== */
@@ -794,6 +846,7 @@ $('recvVbcInput').addEventListener('keydown', e=>{ if(e.key==='Enter') scanVendo
 
 document.addEventListener('DOMContentLoaded', ()=>{
   applyAppText();
+  if(initLabelPreview()) return;   // โหมดพรีวิวฉลาก (?labelpreview=...) — ข้าม login/loadUsers
   const saved=loadSession();
   if(saved){ CURRENT=saved; enterApp(); }
   loadUsers();
