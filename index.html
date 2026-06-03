@@ -679,6 +679,10 @@ function printLabels(){
   lastReceive.unit_barcodes.forEach(code=>{
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
     JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, height:90, width:2});
+    // [T-013 fix] ตั้ง viewBox จากขนาดธรรมชาติก่อนยืด → สเกลแกน X เท่ากันทุกแท่ง
+    // (สัดส่วนแท่งคงที่ ไม่บิด/ไม่ตัดขอบ → เครื่องยิง/กล้องอ่านได้ครบทั้งค่า)
+    const bw=svg.getAttribute('width'), bh=svg.getAttribute('height');
+    svg.setAttribute('viewBox','0 0 '+bw+' '+bh);
     svg.setAttribute('preserveAspectRatio','none');   // ยืดเต็มกว้างฉลาก ไม่มีขอบข้าง
     svg.removeAttribute('width'); svg.removeAttribute('height');
     const svgHtml=new XMLSerializer().serializeToString(svg);
