@@ -9,6 +9,8 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <!-- generate Code128 barcode สำหรับพิมพ์ฉลาก (T-008) -->
 <script src="https://unpkg.com/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<!-- generate QR code สำหรับกล้องมือถือ iOS+Android (T-015) — เล็ก, sync, ออก SVG คมเหมาะ thermal -->
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
 <!-- ฟอนต์ธีม Binance: IBM Plex Sans (+ Thai subset ให้ภาษาไทยคมเหมือนกัน) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -331,7 +333,7 @@ const DEMO = (function(){
   ];
   const units = [];
   const seed = (lot_id, product_id, n, start) => {
-    for(let i=0;i<n;i++){ units.push({unit_barcode:'U-DEMO-'+pad6(start+i), lot_id, product_id, status:'in_stock'}); }
+    for(let i=0;i<n;i++){ units.push({unit_barcode:String(start+i).padStart(8,'0'), lot_id, product_id, status:'in_stock'}); }
   };
   seed('L000012','P0001',5,1); seed('L000005','P0002',4,101); seed('L000020','P0001',8,201);
   let seqUnit=900, seqTxn=50, seqProd=2, seqLot=20;
@@ -361,7 +363,7 @@ const DEMO = (function(){
       const lid='L'+String(++seqLot).padStart(6,'0');
       lots.push({lot_id:lid, product_id:pid, lot_no:p.lot_no||'', expiry_date:p.expiry_date});
       const codes=[];
-      for(let i=0;i<Number(p.qty);i++){ const c='U-DEMO-'+pad6(++seqUnit);
+      for(let i=0;i<Number(p.qty);i++){ const c=String(++seqUnit).padStart(8,'0');
         units.push({unit_barcode:c, lot_id:lid, product_id:pid, status:'in_stock'}); codes.push(c); }
       return {ok:true, product_id:pid, product_name:pname, lot_id:lid, unit_barcodes:codes, txn_id:'T'+String(++seqTxn).padStart(8,'0')};
     },
@@ -474,9 +476,16 @@ function showTab(name){
 }
 
 /* ===== เบิกจ่าย ===== */
+// [T-015] unit_barcode = เลขล้วน (ADR-0003) → ดึงเฉพาะตัวเลข ตัดขยะ/prefix/suffix/Enter ที่เครื่องยิงหรือกล้องแถมมา
+// คุมทุกทางเข้า (กล้อง/เครื่องยิง/พิมพ์มือ) เพราะทุกทางวิ่งผ่าน doIssue
+function normalizeBarcode(raw){
+  const s=String(raw==null?'':raw).trim();
+  const digits=s.replace(/\D/g,'');   // เก็บเฉพาะ 0-9
+  return digits || s;                 // ถ้าไม่มีเลขเลย คืนค่าเดิม (กันพัง)
+}
 function doIssue(code){
   const input=$('issueInput');
-  const bc=(code||input.value).trim();
+  const bc=normalizeBarcode(code||input.value);
   if(!bc||busy) return;
   busy=true; $('issueBtn').disabled=true;
   apiPost({action:'issueForUI', unit_barcode:bc, user:CURRENT.user_id})
@@ -501,11 +510,19 @@ let cam=null;
 function toggleCam(){
   if(cam){ stopCam(); return; }
   $('reader').classList.remove('hidden');
-  cam=new Html5Qrcode('reader');
-  cam.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:130}},
+  // [T-015] อ่าน Code128 จากกล้องให้ติด:
+  //   (1) จำกัด format = CODE_128 → ตัวอ่านโฟกัส ไม่ไล่ทุก type (เดิมอ่านไม่ติด)
+  //   (2) เปิด BarcodeDetector native ของเครื่อง (Android Chrome เร็ว/แม่นกว่า ZXing มาก ; iOS ไม่มี → fallback เอง)
+  const camCfg={verbose:false, experimentalFeatures:{useBarCodeDetectorIfSupported:true}};
+  if(window.Html5QrcodeSupportedFormats){
+    // [T-015] QR ก่อน (iOS+Android กล้องอ่านชัวร์) + Code128 (เผื่อยิงฉลากเก่า/Android)
+    camCfg.formatsToSupport=[Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128];
+  }
+  cam=new Html5Qrcode('reader', camCfg);
+  cam.start({facingMode:'environment'},{fps:10,qrbox:{width:280,height:140},aspectRatio:1.4},
     txt=>{
       // [T-013] สแกน→ใส่กล่อง→กดยืนยัน (ไม่ตัดทันที กันยิงผิดตัด)
-      const code=txt.trim();
+      const code=normalizeBarcode(txt);   // [T-015] ดึงเฉพาะตัวเลข กันขยะจากการสแกน
       stopCam();
       const input=$('issueInput');
       input.value=code; input.focus();
@@ -675,6 +692,7 @@ function printLabels(){
   const expTxt = lastReceive.expiry ? ('EXP '+fmtExpiry(lastReceive.expiry)) : '';
   const nameHtml = esc(lastReceive.product_name||'');
   const expHtml = esc(expTxt);
+  const hasQr = typeof qrcode!=='undefined';   // [T-015] QR ให้กล้องมือถือ (iOS+Android) — ถ้า lib ไม่โหลด ข้าม QR พิมพ์ Code128 อย่างเดียวได้
   let body='';
   lastReceive.unit_barcodes.forEach(code=>{
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -686,11 +704,20 @@ function printLabels(){
     svg.setAttribute('viewBox','0 0 '+bw+' '+bh);
     svg.removeAttribute('width'); svg.removeAttribute('height');
     const svgHtml=new XMLSerializer().serializeToString(svg);
+    // [T-015] QR เก็บค่าเดียวกับ Code128 ; margin 2 module = quiet zone QR ; scalable → SVG ยืดตาม CSS
+    let qrHtml='';
+    if(hasQr){
+      const qr=qrcode(0,'M'); qr.addData(code); qr.make();
+      qrHtml=qr.createSvgTag({scalable:true, margin:2});
+    }
     body +=
       '<div class="label">'+
         '<div class="lb-top"><span class="lb-name">'+nameHtml+'</span><span class="lb-exp">'+expHtml+'</span></div>'+
         '<div class="lb-bc">'+svgHtml+'</div>'+
-        '<div class="lb-code">'+esc(code)+'</div>'+
+        '<div class="lb-bot">'+
+          (hasQr?'<div class="lb-qr">'+qrHtml+'</div>':'')+
+          '<div class="lb-code">'+esc(code)+'</div>'+
+        '</div>'+
       '</div>';
   });
   const doc='<!doctype html><html><head><meta charset="utf-8"><title>labels</title><style>'+
@@ -705,8 +732,12 @@ function printLabels(){
     '.lb-name{font-size:8.5pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}'+
     '.lb-exp{font-size:7pt;font-weight:700;white-space:nowrap;flex-shrink:0;}'+
     '.lb-bc{width:100%;text-align:center;}'+
-    '.lb-bc svg{width:100%;height:auto;max-height:13mm;display:block;}'+
-    '.lb-code{font-size:7pt;letter-spacing:1px;font-family:"Courier New",monospace;'+
+    '.lb-bc svg{width:100%;height:auto;max-height:9mm;display:block;}'+
+    // [T-015] แถวล่าง: QR (มุมซ้าย ให้กล้องมือถือ) + เลข human-readable
+    '.lb-bot{display:flex;align-items:center;gap:1.5mm;}'+
+    '.lb-qr{flex-shrink:0;width:9mm;height:9mm;}'+
+    '.lb-qr svg{width:100%;height:100%;display:block;}'+
+    '.lb-code{flex:1;min-width:0;font-size:8pt;letter-spacing:1px;font-family:"Courier New",monospace;'+
       'font-weight:700;text-align:center;white-space:nowrap;}'+
     '</style></head><body>'+body+'</body></html>';
   let frame=document.getElementById('labelPrintFrame');
