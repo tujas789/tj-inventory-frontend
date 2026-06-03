@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>TJ Inventory</title>
+<!-- สแกน barcode ด้วยกล้องมือถือ (Q4: รองรับทั้ง Chrome/Android + Safari/iOS) -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- generate Code128 barcode สำหรับพิมพ์ฉลาก (T-008) -->
+<script src="https://unpkg.com/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<!-- ฟอนต์ธีม Binance: IBM Plex Sans (+ Thai subset ให้ภาษาไทยคมเหมือนกัน) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ===== ธีม Binance ===== ดำเข้ม + ทอง #FCD535 + เขียว/แดง buy-sell */
+  :root{ --bg:#0b0e11; --card:#181a20; --card2:#1e2026; --line:#2b3139; --txt:#eaecef; --mut:#848e9c;
+         --gold:#fcd535; --gold2:#f0b90b; --green:#0ecb81; --dan:#f6465d; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; font-family:"IBM Plex Sans Thai","IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+        background:var(--bg); color:var(--txt); }
+  header{ background:var(--card); padding:14px 16px; border-bottom:1px solid var(--line);
+          display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:10; }
+  header h1{ font-size:18px; margin:0; }
+  header .who{ margin-left:auto; font-size:12px; color:var(--mut); display:flex; align-items:center; gap:8px; }
+  header .who b{ color:var(--txt); }
+  /* ─── Tab bar ─── */
+  .tabbar{ display:flex; background:var(--card); border-bottom:2px solid var(--line); }
+  .tab-btn{ flex:1; padding:13px 10px; border:none; background:none; color:var(--mut); font-size:14px;
+            font-weight:600; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; transition:.15s; }
+  .tab-btn.active{ color:var(--gold); border-bottom-color:var(--gold); }
+  .tab-btn:active{ background:var(--card2); }
+  /* ─── Layout ─── */
+  .wrap{ max-width:560px; margin:0 auto; padding:16px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .card h2{ font-size:15px; margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+  label{ display:block; font-size:13px; color:var(--mut); margin:10px 0 4px; }
+  input,select{ width:100%; padding:12px; border-radius:8px; border:1px solid var(--line);
+                background:#0b0e11; color:var(--txt); font-size:16px; }
+  input:focus,select:focus{ outline:none; border-color:var(--gold); }
+  .scanbox input{ font-size:22px; font-weight:700; letter-spacing:1px; text-align:center;
+                  border-color:var(--gold); padding:16px; }
+  button{ border:none; border-radius:8px; padding:13px 16px; font-size:15px; font-weight:700;
+          cursor:pointer; color:#0b0e11; background:var(--gold); width:100%; margin-top:12px; }
+  button:active{ background:var(--gold2); }
+  button.green{ background:var(--gold); color:#0b0e11; } button.green:active{ background:var(--gold2); }
+  button.ghost{ background:var(--card2); border:1px solid var(--line); color:var(--txt); }
+  button.sm{ width:auto; padding:8px 12px; font-size:13px; margin:0; }
+  button:disabled{ opacity:.5; }
+  .row{ display:flex; gap:10px; } .row>*{ flex:1; }
+  hr.div{ border:none; border-top:1px solid var(--line); margin:14px 0; }
+  .sub-label{ font-size:13px; color:var(--gold); font-weight:600; margin-bottom:6px; }
+  .monospace{ font-family:monospace; font-size:13px; background:var(--card2); border-radius:8px;
+              padding:10px; max-height:160px; overflow-y:auto; line-height:1.8; word-break:break-all; }
+  /* ─── Toast ─── */
+  .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:30px; z-index:50;
+          padding:14px 20px; border-radius:12px; font-weight:700; font-size:16px; color:#fff;
+          box-shadow:0 8px 30px rgba(0,0,0,.4); opacity:0; transition:.25s; pointer-events:none;
+          max-width:90%; text-align:center; }
+  .toast.show{ opacity:1; bottom:40px; }
+  .toast.ok{ background:var(--green); color:#0b0e11; } .toast.err{ background:var(--dan); }
+  /* ─── List items ─── */
+  .item{ border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:8px; background:var(--card2); }
+  .item .top{ display:flex; justify-content:space-between; align-items:center; }
+  .item .name{ font-weight:700; }
+  .item .meta{ font-size:12px; color:var(--mut); margin-top:4px; }
+  .muted{ color:var(--mut); font-size:13px; }
+  .empty{ text-align:center; color:var(--mut); padding:30px 10px; }
+  /* ─── badge วันหมดอายุ (T-009) ─── */
+  .badge{ font-size:12px; font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .badge.expired{ background:var(--dan); color:#fff; }
+  .badge.warn{ background:var(--gold); color:#0b0e11; }
+  .item.expired{ border-color:var(--dan); }
+  .item.warn{ border-color:var(--gold); }
+  .hidden{ display:none !important; }   /* !important: กัน #login{display:flex} ชนะ class นี้ */
+  #reader{ border-radius:12px; overflow:hidden; margin-top:12px; }
+  /* ─── Login overlay ─── */
+  #login{ position:fixed; inset:0; background:var(--bg); z-index:100; display:flex;
+          align-items:center; justify-content:center; padding:20px; }
+  #login .box{ width:100%; max-width:360px; }
+  #login h1{ text-align:center; font-size:22px; margin:0 0 6px; }
+  #login .sub{ text-align:center; color:var(--mut); font-size:13px; margin-bottom:20px; }
+  #pinInput{ font-size:28px; text-align:center; letter-spacing:8px; font-weight:700; }
+
+  /* ===== พิมพ์ฉลาก thermal (T-008) — สติกเกอร์ 50 x 25 mm (ด้านยาว = แกน barcode) ===== */
+  /* ปรับขนาดสติกเกอร์ที่นี่ที่เดียว ถ้าเปลี่ยนม้วน */
+  :root{ --label-w:50mm; --label-h:25mm; }
+  #printArea{ display:none; }
+  @page{ size:50mm 25mm; margin:0; }
+  @media print{
+    /* ซ่อนทุกอย่างยกเว้นพื้นที่ฉลาก แล้วพิมพ์เฉพาะ label */
+    body > *:not(#printArea){ display:none !important; }
+    #printArea{ display:block !important; }
+    .label{ box-sizing:border-box; width:var(--label-w); height:var(--label-h); padding:1.5mm 2mm;
+            display:flex; flex-direction:column; justify-content:space-between;
+            background:#fff; color:#000; overflow:hidden; page-break-after:always; }
+    .label:last-child{ page-break-after:auto; }
+    .lb-top{ display:flex; justify-content:space-between; align-items:baseline; gap:1mm; }
+    .lb-name{ font-size:8pt; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lb-exp{ font-size:7pt; font-weight:700; white-space:nowrap; }
+    .lb-bc{ width:100%; flex:1; min-height:0; margin:0.5mm 0; }
+    .lb-code{ font-family:"Courier New",monospace; font-size:7pt; font-weight:700;
+              text-align:center; letter-spacing:0.3px; white-space:nowrap; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== Login ===================== -->
+<div id="login">
+  <div class="box">
+    <h1 data-text="app.brand">🧴 TJ Inventory</h1>
+    <div class="sub" data-text="login.subtitle">เลือกชื่อ แล้วใส่ PIN เพื่อเข้าใช้งาน</div>
+    <div class="card">
+      <label data-text="login.userLabel">ชื่อผู้ใช้</label>
+      <select id="userSel"><option data-text="login.loadingUsers">กำลังโหลด...</option></select>
+      <label data-text="login.pinLabel">PIN</label>
+      <input id="pinInput" type="tel" inputmode="numeric" autocomplete="off"
+             data-text-placeholder="login.pinPlaceholder" placeholder="••••">
+      <button class="green" id="loginBtn" onclick="doLogin()" data-text="login.loginBtn">เข้าใช้งาน</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== App (หลัง login) ===================== -->
+<div id="app" class="hidden">
+  <header>
+    <h1 data-text="app.brand">🧴 TJ Inventory</h1>
+    <div class="who">
+      <span>👤 <b id="whoName">-</b></span>
+      <button class="ghost sm" onclick="doLogout()" data-text="header.logout">ออก</button>
+    </div>
+  </header>
+
+  <!-- Tab bar -->
+  <div class="tabbar">
+    <button id="tab-btn-issue"   class="tab-btn active" onclick="showTab('issue')">📤 เบิก</button>
+    <button id="tab-btn-receive" class="tab-btn"        onclick="showTab('receive')">📥 รับเข้า</button>
+    <button id="tab-btn-expiry"  class="tab-btn"        onclick="showTab('expiry')">⏰ หมดอายุ</button>
+  </div>
+
+  <!-- ===== Tab: เบิกจ่าย ===== -->
+  <section id="tab-issue" class="wrap">
+    <div class="card scanbox">
+      <h2 data-text="issue.title">📤 เบิกจ่าย — ยิง barcode ตัดสต๊อกทันที</h2>
+      <input id="issueInput" autocomplete="off"
+             data-text-placeholder="issue.placeholder" placeholder="ยิง / พิมพ์ unit_barcode แล้ว Enter">
+      <div class="row">
+        <button class="green" id="issueBtn" onclick="doIssue()" data-text="issue.submitBtn">ตัดสต๊อก (Enter)</button>
+        <button class="ghost" onclick="toggleCam()" data-text="issue.camBtn">📷 ใช้กล้อง</button>
+      </div>
+      <div id="reader" class="hidden"></div>
+    </div>
+    <div class="card">
+      <h2 data-text="recent.title">🕘 เบิกล่าสุด (เซสชันนี้)</h2>
+      <div id="recent"><div class="empty" data-text="recent.empty">ยังไม่มีการเบิก</div></div>
+    </div>
+  </section>
+
+  <!-- ===== Tab: รับเข้า ===== -->
+  <section id="tab-receive" class="wrap hidden">
+
+    <!-- Card 1: เลือกชนิด -->
+    <div class="card">
+      <h2>📦 เลือกชนิดน้ำยา</h2>
+      <div class="scanbox">
+        <label>ยิง barcode กล่อง (ค้นหาชนิดอัตโนมัติ)</label>
+        <input id="recvVbcInput" autocomplete="off" placeholder="ยิง / พิมพ์ barcode กล่อง แล้ว Enter">
+      </div>
+      <label>หรือเลือกจากรายการ</label>
+      <select id="recvProductSel">
+        <option value="">— กำลังโหลด... —</option>
+      </select>
+      <button class="ghost" style="margin-top:10px" onclick="toggleNewProduct()">➕ สร้างชนิดใหม่</button>
+
+      <!-- ฟอร์มชนิดใหม่ (hidden จนกว่าจะกด) -->
+      <div id="newProductForm" class="hidden">
+        <hr class="div">
+        <div class="sub-label">ชนิดใหม่ — กรอกข้อมูลด้านล่าง</div>
+        <label>ชื่อน้ำยา *</label>
+        <input id="newProductName" autocomplete="off" placeholder="เช่น น้ำยาล้างคราบ A">
+        <label>หน่วยนับ *</label>
+        <input id="newProductUom" autocomplete="off" placeholder="เช่น ขวด / แกลลอน / ลัง">
+        <label>barcode กล่อง (vendor) — ถ้ามี</label>
+        <input id="newProductVbc" autocomplete="off" placeholder="barcode ข้างกล่องจากผู้ขาย (optional)">
+      </div>
+    </div>
+
+    <!-- Card 2: รายละเอียดล็อต -->
+    <div class="card">
+      <h2>📋 รายละเอียดล็อต</h2>
+      <label>เลขล็อต (ข้างกล่อง) — ถ้ามี</label>
+      <input id="recvLotNo" autocomplete="off" placeholder="เช่น LOT-2026-A">
+      <label>วันหมดอายุ *</label>
+      <input id="recvExpiry" type="date">
+      <label>จำนวนที่รับเข้า *</label>
+      <input id="recvQty" type="number" min="1" value="1" inputmode="numeric">
+      <button id="recvBtn" class="green" onclick="doReceive()">📥 รับเข้า</button>
+    </div>
+
+    <!-- Card 3: ผลลัพธ์ (hidden จนกว่าสำเร็จ) -->
+    <div id="recvResult" class="card hidden">
+      <h2>✅ รับเข้าสำเร็จ</h2>
+      <div id="recvResultBody"></div>
+      <button class="green" id="printBtn" onclick="printLabels()">🖨️ พิมพ์ฉลาก</button>
+      <button class="ghost" onclick="resetReceive()" style="margin-top:8px">🔄 รับเข้าชุดถัดไป</button>
+    </div>
+
+  </section>
+
+  <!-- ===== Tab: ใกล้หมดอายุ (FEFO — T-009) ===== -->
+  <section id="tab-expiry" class="wrap hidden">
+    <div class="card">
+      <h2>⏰ ล็อตใกล้หมดอายุ <button class="ghost sm" style="margin-left:auto" onclick="initExpiryTab()">🔄 รีเฟรช</button></h2>
+      <div id="expirySummary" class="muted" style="margin-bottom:10px">กำลังโหลด...</div>
+      <div id="expiryList"></div>
+    </div>
+  </section>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- พื้นที่พิมพ์ฉลาก (T-008) — ซ่อนบนจอ แสดงเฉพาะตอน window.print() -->
+<div id="printArea"></div>
+
+<script>
+/* ============================================================
+   APP_TEXT — รวมข้อความ UI ทั้งหมดไว้จุดเดียว
+   ============================================================ */
+const APP_TEXT = {
+  app: {
+    title: 'TJ Inventory',
+    brand: '🧴 TJ Inventory',
+  },
+  login: {
+    subtitle:        'เลือกชื่อ แล้วใส่ PIN เพื่อเข้าใช้งาน',
+    userLabel:       'ชื่อผู้ใช้',
+    pinLabel:        'PIN',
+    pinPlaceholder:  '••••',
+    loginBtn:        'เข้าใช้งาน',
+    loadingUsers:    'กำลังโหลด...',
+    noUsers:         '— ไม่มีผู้ใช้ในระบบ —',
+    pickUser:        'เลือกชื่อก่อน',
+    enterPin:        'ใส่ PIN ก่อน',
+    failed:          'เข้าไม่ได้',
+    loadUsersFailTpl:'โหลดรายชื่อไม่ได้: {msg}',
+  },
+  header: { logout: 'ออก' },
+  issue: {
+    title:       '📤 เบิกจ่าย — ยิง barcode ตัดสต๊อกทันที',
+    placeholder: 'ยิง / พิมพ์ unit_barcode แล้ว Enter',
+    submitBtn:   'ตัดสต๊อก (Enter)',
+    camBtn:      '📷 ใช้กล้อง',
+    okTpl:       '✅ ตัดสต๊อก: {name}',
+    failed:      'เบิกไม่สำเร็จ',
+    failTpl:     '❌ {msg}',
+  },
+  recent: {
+    title:     '🕘 เบิกล่าสุด (เซสชันนี้)',
+    empty:     'ยังไม่มีการเบิก',
+    lotPrefix: 'Lot',
+  },
+  cam: { openFailTpl: 'เปิดกล้องไม่ได้: {msg}' },
+  common: { errorTpl: 'ผิดพลาด: {msg}' },
+};
+
+function t(path){ return path.split('.').reduce((o,k)=>(o&&o[k]!==undefined)?o[k]:undefined, APP_TEXT); }
+function tf(tpl, vars){ return String(tpl).replace(/\{(\w+)\}/g,(_,k)=>vars[k]!==undefined?vars[k]:'{'+k+'}'); }
+function applyAppText(){
+  document.querySelectorAll('[data-text]').forEach(el=>{ const v=t(el.getAttribute('data-text')); if(typeof v==='string') el.textContent=v; });
+  document.querySelectorAll('[data-text-placeholder]').forEach(el=>{ const v=t(el.getAttribute('data-text-placeholder')); if(typeof v==='string') el.placeholder=v; });
+  if(APP_TEXT.app.title) document.title=APP_TEXT.app.title;
+}
+
+/* ============================================================ */
+const $ = id => document.getElementById(id);
+let CURRENT = null;
+const recent = [];
+let busy = false;
+
+/* ============================================================
+   API LAYER — frontend แยกจาก Apps Script (ADR-0002)
+   ★ ไฟล์นี้เปิดตรงๆ (file://) หรือ host ก็ได้ แล้ว fetch ไป Apps Script เป็น API
+   เหตุผลที่ไม่ใช้ HtmlService + google.script.run: HtmlService เสิร์ฟใน sandbox
+   iframe → สั่งพิมพ์ฉลาก @page ไม่ทำงาน (หมุน 90°) — ดู JOURNAL 2026-06-03
+
+   ▼▼▼ วาง URL /exec จริงตรงนี้ (Apps Script → Deploy → Web app → /exec) ▼▼▼ */
+const API_URL = 'https://script.google.com/macros/s/AKfycbxpmNPzFf3s4CGMdXlEUpk_b0L6tkYxEg8sSYl7TR5yVCT16w5yCH2CXDPogF-DpjJZ/exec';
+/* ▲▲▲ ────────────────────────────────────────────────────────── ▲▲▲
+   โหมดเดโม: เติม ?demo ท้าย URL ตอนเปิดไฟล์ → ใช้ข้อมูลตัวอย่างใน memory (ไม่ยิง server)
+   ============================================================ */
+const IS_DEMO = /[?&]demo(=|&|$)/.test(location.search) || /PASTE_EXEC_URL/.test(API_URL);
+
+// GET = อ่าน (action + params ผ่าน query) | POST = เขียน (JSON body)
+// ★ ไม่ตั้ง Content-Type เอง → body กลายเป็น text/plain → เป็น "simple request" → ไม่มี CORS preflight
+//   (เคล็ดลับนี้คือกุญแจให้ fetch คุย Apps Script ได้โดยไม่ติด CORS — ดู BactBud)
+function apiGet(action, params){
+  if(IS_DEMO) return DEMO.call(action, params||{});
+  const q=new URLSearchParams(Object.assign({action}, params||{}));
+  return fetch(API_URL+'?'+q.toString()).then(r=>r.json());
+}
+function apiPost(payload){
+  if(IS_DEMO) return DEMO.call(payload.action, payload);
+  return fetch(API_URL, {method:'POST', body:JSON.stringify(payload)}).then(r=>r.json());
+}
+
+/* ===== DEMO dispatcher (ทำงานเมื่อ IS_DEMO) — ข้อมูลตัวอย่างปลอมใน memory =====
+   คืนค่าเป็น Promise เหมือน fetch จริง → call site ใช้ .then()/.catch() ได้เหมือนกัน */
+const DEMO = (function(){
+  const today = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const pad6 = n => String(n).padStart(6,'0');
+  const ymd = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  const addDays = n => { const d=new Date(today); d.setDate(d.getDate()+n); return ymd(d); };
+  const daysBetween = (a,b)=> Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000);
+
+  const users = [
+    {user_id:'admin',   display_name:'ผู้ดูแลระบบ (เดโม)', role:'admin'},
+    {user_id:'somchai', display_name:'สมชาย คลัง (เดโม)',  role:'staff'},
+  ];
+  const products = [
+    {product_id:'P0001', name:'น้ำยาล้างคราบ A', vendor_barcode:'8850123456789', unit_of_measure:'ขวด'},
+    {product_id:'P0002', name:'น้ำยาเคลือบเงา B', vendor_barcode:'8850987654321', unit_of_measure:'แกลลอน'},
+  ];
+  const lots = [
+    {lot_id:'L000012', product_id:'P0001', lot_no:'LOT-2026-A', expiry_date:addDays(10)},   // ใกล้หมด
+    {lot_id:'L000005', product_id:'P0002', lot_no:'LOT-2025-X', expiry_date:addDays(-13)},  // หมดอายุแล้ว
+    {lot_id:'L000020', product_id:'P0001', lot_no:'LOT-2027-B', expiry_date:addDays(300)},  // ยังอีกนาน (ไม่เตือน)
+  ];
+  const units = [];
+  const seed = (lot_id, product_id, n, start) => {
+    for(let i=0;i<n;i++){ units.push({unit_barcode:'U-DEMO-'+pad6(start+i), lot_id, product_id, status:'in_stock'}); }
+  };
+  seed('L000012','P0001',5,1); seed('L000005','P0002',4,101); seed('L000020','P0001',8,201);
+  let seqUnit=900, seqTxn=50, seqProd=2, seqLot=20;
+  const nameOf  = pid => (products.find(p=>p.product_id===pid)||{}).name || pid;
+  const lotNoOf = lid => (lots.find(l=>l.lot_id===lid)||{}).lot_no || lid;
+
+  const handlers = {
+    getUsers(){ return {ok:true, users:users.map(u=>({...u}))}; },
+    verifyPin(p){
+      const u=users.find(x=>x.user_id===(p&&p.user_id));   // เดโม: PIN อะไรก็ได้
+      return u ? {ok:true, user_id:u.user_id, display_name:u.display_name, role:u.role}
+               : {ok:false, error:'ไม่พบผู้ใช้ (เดโม)'};
+    },
+    getProducts(){ return {ok:true, products:products.map(p=>({...p}))}; },
+    lookupByVendorBarcode(p){
+      const found=products.filter(x=>x.vendor_barcode===String(p.vendor_barcode).trim());
+      return {ok:true, products:found.map(x=>({...x}))};
+    },
+    receiveForUI(p){
+      let pid=p.product_id, pname;
+      if(!pid){
+        if(!p.new_product||!p.new_product.name) return {ok:false,error:'กรุณาเลือกชนิด (เดโม)'};
+        pid='P'+String(++seqProd).padStart(4,'0');
+        products.push({product_id:pid, name:p.new_product.name, vendor_barcode:p.new_product.vendor_barcode||'', unit_of_measure:p.new_product.unit_of_measure||''});
+        pname=p.new_product.name;
+      } else pname=nameOf(pid);
+      const lid='L'+String(++seqLot).padStart(6,'0');
+      lots.push({lot_id:lid, product_id:pid, lot_no:p.lot_no||'', expiry_date:p.expiry_date});
+      const codes=[];
+      for(let i=0;i<Number(p.qty);i++){ const c='U-DEMO-'+pad6(++seqUnit);
+        units.push({unit_barcode:c, lot_id:lid, product_id:pid, status:'in_stock'}); codes.push(c); }
+      return {ok:true, product_id:pid, product_name:pname, lot_id:lid, unit_barcodes:codes, txn_id:'T'+String(++seqTxn).padStart(8,'0')};
+    },
+    issueForUI(p){
+      const u=units.find(x=>x.unit_barcode===String(p.unit_barcode).trim());
+      if(!u) return {ok:false,error:'ไม่พบ barcode นี้ (เดโม)'};
+      if(u.status!=='in_stock') return {ok:false,error:'ถูกเบิกไปแล้ว (เดโม)'};
+      u.status='issued';
+      return {ok:true, unit_barcode:u.unit_barcode, product_id:u.product_id, product_name:nameOf(u.product_id), lot_id:u.lot_id, lot_no:lotNoOf(u.lot_id), txn_id:'T-DEMO'};
+    },
+    expiringLots(p){
+      const warn=(p&&p.warn_days!=null&&p.warn_days!=='')?Number(p.warn_days):60;
+      const todayStr=ymd(today);
+      const counts={}; units.forEach(u=>{ if(u.status==='in_stock') counts[u.lot_id]=(counts[u.lot_id]||0)+1; });
+      const rows=[]; let ec=0,wc=0;
+      lots.forEach(l=>{
+        const inStock=counts[l.lot_id]||0; if(inStock<=0) return;
+        const dl=daysBetween(todayStr, l.expiry_date); if(dl>warn) return;
+        const level=dl<0?'expired':'warn'; if(level==='expired')ec++; else wc++;
+        rows.push({lot_id:l.lot_id, lot_no:l.lot_no, product_id:l.product_id, product_name:nameOf(l.product_id), expiry_date:l.expiry_date, in_stock:inStock, days_left:dl, level});
+      });
+      rows.sort((a,b)=>a.days_left-b.days_left);
+      return {ok:true, today:todayStr, warn_days:warn, rows, expired_count:ec, warn_count:wc};
+    },
+  };
+
+  // ป้ายมุมจอบอกว่าอยู่โหมดเดโม (กันสับสนกับของจริง)
+  if(IS_DEMO){
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const tag=document.createElement('div');
+      tag.textContent='🧪 โหมดทดลอง — ข้อมูลตัวอย่าง (ยิงเบิกลอง U-DEMO-000001)';
+      tag.style.cssText='position:fixed;left:8px;bottom:8px;z-index:200;background:#f6465d;color:#fff;font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;opacity:.92;box-shadow:0 2px 8px rgba(0,0,0,.4)';
+      document.body.appendChild(tag);
+    });
+  }
+
+  return { call(action, params){
+    return new Promise((resolve,reject)=>{
+      setTimeout(()=>{                       // จำลอง latency เล็กน้อย
+        const h=handlers[action];
+        if(!h){ reject(new Error('demo: ไม่รู้จัก action '+action)); return; }
+        try{ resolve(h(params||{})); }catch(e){ reject(e); }
+      }, 150);
+    });
+  }};
+})();
+
+/* ===== Session ===== */
+function saveSession(o){ try{ sessionStorage.setItem('tj_user', JSON.stringify(o)); }catch(e){} }
+function clearSession(){ try{ sessionStorage.removeItem('tj_user'); }catch(e){} }
+function loadSession(){ try{ const r=sessionStorage.getItem('tj_user'); return r?JSON.parse(r):null; }catch(e){ return null; } }
+
+/* ===== Toast ===== */
+function toast(msg, ok=true){
+  const el=$('toast'); el.textContent=msg;
+  el.className='toast show '+(ok?'ok':'err');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.className='toast', 2500);
+  if(navigator.vibrate) navigator.vibrate(ok?60:[60,40,60]);
+}
+
+/* ===== Login ===== */
+function loadUsers(){
+  const sel=$('userSel');
+  apiGet('getUsers')
+    .then(res=>{
+      if(!res||!res.ok){ sel.innerHTML=`<option value="">⚠️ ${(res&&res.error)||APP_TEXT.login.noUsers}</option>`; return; }
+      if(!res.users.length){ sel.innerHTML=`<option value="">${APP_TEXT.login.noUsers}</option>`; return; }
+      sel.innerHTML=res.users.map(u=>`<option value="${u.user_id}">${u.display_name}</option>`).join('');
+    })
+    .catch(e=>{
+      sel.innerHTML=`<option value="">⚠️ โหลดรายชื่อไม่ได้</option>`;
+      toast(tf(APP_TEXT.login.loadUsersFailTpl,{msg:e.message}),false);
+    });
+}
+function doLogin(){
+  const user_id=$('userSel').value; const pin=$('pinInput').value.trim();
+  if(!user_id){ toast(APP_TEXT.login.pickUser,false); return; }
+  if(!pin){ toast(APP_TEXT.login.enterPin,false); $('pinInput').focus(); return; }
+  $('loginBtn').disabled=true;
+  apiPost({action:'verifyPin', user_id, pin})
+    .then(res=>{
+      $('loginBtn').disabled=false;
+      if(!res||!res.ok){ toast((res&&res.error)||APP_TEXT.login.failed,false); $('pinInput').select(); return; }
+      CURRENT=res; saveSession(res); enterApp();
+    })
+    .catch(e=>{ $('loginBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
+}
+function doLogout(){
+  stopCam(); CURRENT=null; clearSession();
+  $('app').classList.add('hidden'); $('login').classList.remove('hidden');
+  $('pinInput').value=''; $('pinInput').focus();
+}
+function enterApp(){
+  $('whoName').textContent=CURRENT.display_name;
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+  showTab('issue');
+}
+
+/* ===== Tabs ===== */
+let receiveTabInited=false;
+let expiryTabInited=false;
+function showTab(name){
+  ['issue','receive','expiry'].forEach(n=>{
+    $('tab-'+n).classList.toggle('hidden', n!==name);
+    $('tab-btn-'+n).classList.toggle('active', n===name);
+  });
+  if(name==='issue'){ stopCam(); $('issueInput').focus(); }
+  if(name==='receive' && !receiveTabInited){ receiveTabInited=true; initReceiveTab(); }
+  if(name==='expiry' && !expiryTabInited){ expiryTabInited=true; initExpiryTab(); }
+}
+
+/* ===== เบิกจ่าย ===== */
+function doIssue(code){
+  const input=$('issueInput');
+  const bc=(code||input.value).trim();
+  if(!bc||busy) return;
+  busy=true; $('issueBtn').disabled=true;
+  apiPost({action:'issueForUI', unit_barcode:bc, user:CURRENT.user_id})
+    .then(res=>{
+      busy=false; $('issueBtn').disabled=false;
+      if(!res||!res.ok){ toast(tf(APP_TEXT.issue.failTpl,{msg:(res&&res.error)||APP_TEXT.issue.failed}),false); input.select(); return; }
+      toast(tf(APP_TEXT.issue.okTpl,{name:res.product_name||res.unit_barcode}));
+      recent.unshift(res); renderRecent(); input.value=''; input.focus();
+    })
+    .catch(e=>{ busy=false; $('issueBtn').disabled=false; toast(tf(APP_TEXT.issue.failTpl,{msg:tf(APP_TEXT.common.errorTpl,{msg:e.message})}),false); input.select(); });
+}
+function renderRecent(){
+  if(!recent.length){ $('recent').innerHTML=`<div class="empty">${APP_TEXT.recent.empty}</div>`; return; }
+  $('recent').innerHTML=recent.slice(0,10).map(r=>{
+    const tm=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="item"><div class="top"><div><div class="name">${r.product_name||r.unit_barcode}</div><div class="meta">${r.unit_barcode} • ${APP_TEXT.recent.lotPrefix} ${r.lot_no||'-'}</div></div><div class="muted">${tm}</div></div></div>`;
+  }).join('');
+}
+
+/* ===== กล้องสแกน (tab เบิกจ่าย) ===== */
+let cam=null, lastScan='', lastScanAt=0;
+function toggleCam(){
+  if(cam){ stopCam(); return; }
+  $('reader').classList.remove('hidden');
+  cam=new Html5Qrcode('reader');
+  cam.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:130}},
+    txt=>{
+      const nowMs=Date.now();
+      if(txt===lastScan&&nowMs-lastScanAt<2500) return;
+      lastScan=txt; lastScanAt=nowMs; doIssue(txt);
+    },
+    ()=>{}).catch(e=>toast(tf(APP_TEXT.cam.openFailTpl,{msg:e}),false));
+}
+function stopCam(){ if(cam){ cam.stop().then(()=>cam.clear()).catch(()=>{}); cam=null; } $('reader').classList.add('hidden'); }
+
+/* ===== รับเข้า ===== */
+let recvProducts=[];
+let isNewProduct=false;
+let lastReceive=null;   // เก็บผลรับเข้าล่าสุดไว้พิมพ์ฉลาก (T-008)
+
+function initReceiveTab(){
+  apiGet('getProducts')
+    .then(res=>{
+      recvProducts=(res&&res.ok)?res.products:[];
+      renderProductDropdown(recvProducts);
+    })
+    .catch(e=>toast('โหลดชนิดน้ำยาไม่ได้: '+e.message,false));
+}
+
+function renderProductDropdown(list){
+  const sel=$('recvProductSel');
+  if(!list||!list.length){ sel.innerHTML='<option value="">— ยังไม่มีชนิดน้ำยา —</option>'; return; }
+  sel.innerHTML='<option value="">— เลือกชนิด —</option>'+
+    list.map(p=>`<option value="${p.product_id}">${p.name} (${p.unit_of_measure})</option>`).join('');
+}
+
+function scanVendorBarcode(){
+  const bc=$('recvVbcInput').value.trim();
+  if(!bc) return;
+  apiGet('lookupByVendorBarcode', {vendor_barcode:bc})
+    .then(res=>{
+      if(!res||!res.ok){ toast(res.error||'ค้นหาไม่ได้',false); return; }
+      $('recvVbcInput').value='';
+      if(res.products.length===0){
+        toast('ไม่พบชนิดนี้ — กรุณากรอกชนิดใหม่',false);
+        showNewProductForm(bc);
+      } else if(res.products.length===1){
+        selectProduct(res.products[0]);
+        toast('พบ: '+res.products[0].name);
+      } else {
+        renderProductDropdown(res.products);
+        toast('พบ '+res.products.length+' ชนิด — กรุณาเลือก');
+      }
+    })
+    .catch(e=>toast('ค้นหาไม่ได้: '+e.message,false));
+}
+
+function selectProduct(prod){
+  const sel=$('recvProductSel');
+  let found=false;
+  for(let i=0;i<sel.options.length;i++){
+    if(sel.options[i].value===prod.product_id){ sel.selectedIndex=i; found=true; break; }
+  }
+  if(!found){
+    const opt=document.createElement('option');
+    opt.value=prod.product_id; opt.textContent=prod.name+' ('+prod.unit_of_measure+')';
+    sel.appendChild(opt); sel.value=prod.product_id;
+  }
+  hideNewProductForm();
+}
+
+function showNewProductForm(vbc){
+  isNewProduct=true;
+  $('newProductForm').classList.remove('hidden');
+  if(vbc) $('newProductVbc').value=vbc;
+  $('newProductName').focus();
+}
+function hideNewProductForm(){
+  isNewProduct=false;
+  $('newProductForm').classList.add('hidden');
+}
+function toggleNewProduct(){
+  if($('newProductForm').classList.contains('hidden')){
+    $('recvProductSel').value='';
+    showNewProductForm($('recvVbcInput').value.trim());
+  } else {
+    hideNewProductForm();
+  }
+}
+
+function doReceive(){
+  const expiry=$('recvExpiry').value.trim();
+  const qty=Number($('recvQty').value);
+  if(!expiry){ toast('กรุณาระบุวันหมดอายุ',false); $('recvExpiry').focus(); return; }
+  if(!qty||qty<1){ toast('กรุณาระบุจำนวน ≥ 1',false); $('recvQty').focus(); return; }
+
+  const payload={lot_no:$('recvLotNo').value.trim(), expiry_date:expiry, qty, user:CURRENT.user_id};
+
+  if(isNewProduct){
+    const name=$('newProductName').value.trim();
+    const uom=$('newProductUom').value.trim();
+    if(!name){ toast('กรุณาใส่ชื่อน้ำยา',false); $('newProductName').focus(); return; }
+    if(!uom){ toast('กรุณาใส่หน่วยนับ',false); $('newProductUom').focus(); return; }
+    payload.new_product={name, unit_of_measure:uom, vendor_barcode:$('newProductVbc').value.trim()};
+  } else {
+    const pid=$('recvProductSel').value;
+    if(!pid){ toast('กรุณาเลือกชนิดน้ำยา',false); return; }
+    payload.product_id=pid;
+  }
+
+  $('recvBtn').disabled=true;
+  apiPost(Object.assign({action:'receiveForUI'}, payload))
+    .then(res=>{
+      $('recvBtn').disabled=false;
+      if(!res||!res.ok){ toast(res.error||'รับเข้าไม่สำเร็จ',false); return; }
+      toast('✅ รับเข้า '+res.unit_barcodes.length+' ชิ้น สำเร็จ');
+      // เก็บข้อมูลฉลากฝั่ง client (ชื่อ/วันหมดอายุ/unit_barcode) — ครบไม่ต้องถาม server ซ้ำ
+      lastReceive={
+        product_name: res.product_name||res.product_id,
+        expiry:       payload.expiry_date,
+        lot_no:       payload.lot_no,
+        lot_id:       res.lot_id,
+        unit_barcodes:res.unit_barcodes,
+      };
+      renderReceiveResult(res);
+    })
+    .catch(e=>{ $('recvBtn').disabled=false; toast('ผิดพลาด: '+e.message,false); });
+}
+
+function renderReceiveResult(res){
+  $('recvResultBody').innerHTML=
+    `<div class="item">
+       <div class="name">${res.product_name||res.product_id}</div>
+       <div class="meta">Lot ${res.lot_id} &nbsp;·&nbsp; รับเข้า ${res.unit_barcodes.length} ชิ้น &nbsp;·&nbsp; txn ${res.txn_id}</div>
+     </div>
+     <div style="margin-top:10px">
+       <div class="muted" style="margin-bottom:4px">unit_barcode ที่สร้าง:</div>
+       <div class="monospace">${res.unit_barcodes.join('<br>')}</div>
+     </div>`;
+  $('printBtn').textContent='🖨️ พิมพ์ฉลาก '+res.unit_barcodes.length+' ดวง';
+  $('recvResult').classList.remove('hidden');
+}
+
+function resetReceive(){
+  $('recvVbcInput').value=''; $('recvLotNo').value='';
+  $('recvExpiry').value=''; $('recvQty').value='1';
+  $('newProductName').value=''; $('newProductUom').value=''; $('newProductVbc').value='';
+  hideNewProductForm();
+  $('recvResult').classList.add('hidden');
+  lastReceive=null;
+  receiveTabInited=false; initReceiveTab();  // refresh dropdown (กรณีสร้างชนิดใหม่)
+  $('recvVbcInput').focus();
+}
+
+/* ===== พิมพ์ฉลาก thermal (T-008) ===== */
+/** แปลง 'YYYY-MM-DD' → 'DD/MM/YY' สำหรับโชว์บนฉลาก */
+function fmtExpiry(d){
+  const p=String(d||'').split('-');
+  if(p.length!==3) return d||'';
+  return p[2]+'/'+p[1]+'/'+p[0].slice(2);
+}
+function printLabels(){
+  if(!lastReceive || !lastReceive.unit_barcodes || !lastReceive.unit_barcodes.length){
+    toast('ไม่มีฉลากให้พิมพ์',false); return;
+  }
+  if(typeof JsBarcode==='undefined'){ toast('โหลดตัวสร้าง barcode ไม่ได้ (เช็กเน็ต)',false); return; }
+  // ── พิมพ์ผ่าน hidden iframe แล้วสั่ง frame.contentWindow.print() ────────────
+  // วิธีนี้พิสูจน์แล้วใน BactBud v6_6_2 ว่าพิมพ์ตรงแนวกับ Zebra (ไม่หมุน)
+  // เหตุผล: สั่ง print() บน iframe ที่เราคุมเอง → @page ของ iframe ถูกใช้จริง
+  //         (ต่างจาก window.open ที่เครื่องใช้ page default → หมุน 90°)
+  // กันหน้าว่างคั่น: ใช้ page-break-before เฉพาะ label ที่ 2 เป็นต้นไป (ไม่มี break ท้ายสุด)
+  const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const expTxt = lastReceive.expiry ? ('EXP '+fmtExpiry(lastReceive.expiry)) : '';
+  const nameHtml = esc(lastReceive.product_name||'');
+  const expHtml = esc(expTxt);
+  let body='';
+  lastReceive.unit_barcodes.forEach(code=>{
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, height:90, width:2});
+    svg.setAttribute('preserveAspectRatio','none');   // ยืดเต็มกว้างฉลาก ไม่มีขอบข้าง
+    svg.removeAttribute('width'); svg.removeAttribute('height');
+    const svgHtml=new XMLSerializer().serializeToString(svg);
+    body +=
+      '<div class="label">'+
+        '<div class="lb-top"><span class="lb-name">'+nameHtml+'</span><span class="lb-exp">'+expHtml+'</span></div>'+
+        '<div class="lb-bc">'+svgHtml+'</div>'+
+        '<div class="lb-code">'+esc(code)+'</div>'+
+      '</div>';
+  });
+  const doc='<!doctype html><html><head><meta charset="utf-8"><title>labels</title><style>'+
+    '@page{size:50mm 25mm;margin:0;}'+
+    '*{margin:0;padding:0;box-sizing:border-box;}'+
+    'html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'+
+    '.label{width:50mm;height:24mm;padding:1mm 2mm;display:flex;flex-direction:column;'+
+      'justify-content:space-between;overflow:hidden;color:#000;'+
+      'font-family:"Segoe UI",Tahoma,sans-serif;}'+
+    '.label+.label{page-break-before:always;}'+
+    '.lb-top{display:flex;align-items:baseline;justify-content:space-between;gap:2mm;}'+
+    '.lb-name{font-size:8.5pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}'+
+    '.lb-exp{font-size:7pt;font-weight:700;white-space:nowrap;flex-shrink:0;}'+
+    '.lb-bc{width:100%;height:11mm;}'+
+    '.lb-bc svg{width:100%;height:100%;display:block;}'+
+    '.lb-code{font-size:7pt;letter-spacing:1px;font-family:"Courier New",monospace;'+
+      'font-weight:700;text-align:center;white-space:nowrap;}'+
+    '</style></head><body>'+body+'</body></html>';
+  let frame=document.getElementById('labelPrintFrame');
+  if(!frame){
+    frame=document.createElement('iframe');
+    frame.id='labelPrintFrame';
+    frame.setAttribute('aria-hidden','true');
+    frame.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+    document.body.appendChild(frame);
+  }
+  const fdoc=frame.contentWindow.document;
+  fdoc.open(); fdoc.write(doc); fdoc.close();
+  // รอ layout/วาด SVG เสร็จ แล้วสั่งพิมพ์จาก iframe โดยตรง
+  setTimeout(function(){
+    try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
+    catch(e){ toast('พิมพ์ไม่สำเร็จ: '+e.message,false); }
+  },150);
+}
+
+/* ===== ใกล้หมดอายุ (FEFO — T-009) ===== */
+function initExpiryTab(){
+  $('expirySummary').textContent='กำลังโหลด...';
+  $('expiryList').innerHTML='';
+  apiGet('expiringLots')
+    .then(res=>{
+      if(!res||!res.ok){ $('expirySummary').textContent=(res&&res.error)||'โหลดไม่สำเร็จ'; return; }
+      renderExpiry(res);
+    })
+    .catch(e=>{ $('expirySummary').textContent='ผิดพลาด: '+e.message; });
+}
+function renderExpiry(res){
+  $('expirySummary').innerHTML=
+    `เกณฑ์เตือน ≤ <b>${res.warn_days}</b> วัน &nbsp;·&nbsp; `+
+    `🔴 หมดอายุแล้ว <b>${res.expired_count}</b> &nbsp;·&nbsp; 🟡 ใกล้หมด <b>${res.warn_count}</b>`;
+  if(!res.rows.length){
+    $('expiryList').innerHTML=`<div class="empty">🎉 ไม่มีล็อตใกล้หมดอายุ (ภายใน ${res.warn_days} วัน)</div>`;
+    return;
+  }
+  $('expiryList').innerHTML=res.rows.map(r=>{
+    const badge = r.level==='expired'
+      ? `<span class="badge expired">หมดอายุแล้ว ${Math.abs(r.days_left)} วัน</span>`
+      : `<span class="badge warn">เหลือ ${r.days_left} วัน</span>`;
+    return `<div class="item ${r.level}"><div class="top">
+      <div><div class="name">${r.product_name}</div>
+      <div class="meta">Lot ${r.lot_no||r.lot_id} • หมดอายุ ${r.expiry_date} • คงเหลือ ${r.in_stock} ชิ้น</div></div>
+      ${badge}</div></div>`;
+  }).join('');
+}
+
+/* ===== Init ===== */
+$('issueInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doIssue(); });
+$('pinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('recvVbcInput').addEventListener('keydown', e=>{ if(e.key==='Enter') scanVendorBarcode(); });
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  applyAppText();
+  const saved=loadSession();
+  if(saved){ CURRENT=saved; enterApp(); }
+  loadUsers();
+});
+</script>
+</body>
+</html>
