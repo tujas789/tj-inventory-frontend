@@ -522,10 +522,11 @@ function toggleCam(){
   // [T-015] iPhone (iOS Safari ไม่มี BarcodeDetector → ตก ZXing) อ่าน QR ติด:
   //   (1) ขอวิดีโอความละเอียดสูง (1920) + โฟกัสต่อเนื่อง → ภาพคม โฟกัส QR ระยะใกล้ได้
   //   (2) qrbox เป็น "จัตุรัส" ตามรูปทรง QR (เดิมเป็นผืนผ้า 280×140 ไม่พอดี) + ปรับตามขนาดจอ
-  const videoConstraints={ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080},
-                           advanced:[{focusMode:'continuous'}] };
+  // ⚠️ arg แรกของ cam.start() ต้องมี key เดียว (html5-qrcode บังคับ) — constraints ละเอียดวางใน config.videoConstraints
+  const videoConstraints={ width:{ideal:1920}, height:{ideal:1080},
+                           facingMode:{ideal:'environment'}, advanced:[{focusMode:'continuous'}] };
   const qrboxFn=(vw,vh)=>{ const m=Math.floor(Math.min(vw,vh)*0.72); return {width:m,height:m}; };
-  cam.start(videoConstraints,{fps:12,qrbox:qrboxFn},
+  cam.start({facingMode:'environment'},{fps:12,qrbox:qrboxFn,videoConstraints:videoConstraints},
     txt=>{
       // [T-013] สแกน→ใส่กล่อง→กดยืนยัน (ไม่ตัดทันที กันยิงผิดตัด)
       const code=normalizeBarcode(txt);   // [T-015] ดึงเฉพาะตัวเลข กันขยะจากการสแกน
