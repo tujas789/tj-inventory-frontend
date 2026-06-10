@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TJ Inventory — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ─── Reset & Root ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:#0b0e11; --surface:#181a20; --border:#2b3139; --border-2:rgba(255,255,255,0.06);
+      --ink:#eaecef; --ink-2:#eaecef; --muted:#848e9c;
+      --gold:#fcd535; --gold2:#f0b90b; --green:#0ecb81; --dan:#f6465d;
+      --font-sans: 'IBM Plex Sans Thai','IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+      --font-mono: 'IBM Plex Mono','Courier New',monospace;
+      /* pastel accents */
+      --red-bg:rgba(246,70,93,0.12); --red-ink:#f6465d;
+      --blue-bg:rgba(30,150,255,0.12); --blue-ink:#5eadf7;
+      --green-bg:rgba(14,203,129,0.12); --green-ink:#0ecb81;
+      --yellow-bg:rgba(252,213,53,0.12); --yellow-ink:#fcd535;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--ink-2);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── Topbar ─── */
+    .topbar {
+      position: sticky; top: 0; z-index: 40;
+      background: rgba(11,14,17,0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-brand {
+      font-family: var(--font-sans);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: -0.02em;
+      text-decoration: none;
+    }
+    .topbar-right {
+      display: flex; align-items: center; gap: 16px;
+    }
+    .topbar-app-link {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 4px;
+      transition: color .15s, border-color .15s;
+    }
+    .topbar-app-link:hover { color: var(--ink); border-color: #ccc; }
+    .last-updated {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ─── Main layout ─── */
+    .main { max-width: 1100px; margin: 0 auto; padding: 48px 32px 96px; }
+
+    /* ─── Section header ─── */
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .section-heading {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 28px;
+      color: var(--ink);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 32px;
+    }
+    .section-heading em { font-style: normal; color: var(--muted); font-weight: 400; font-size: 20px; }
+
+    /* ─── KPI Bento Grid ─── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 48px;
+    }
+    .kpi-card {
+      background: var(--surface);
+      padding: 28px 28px 24px;
+      position: relative;
+    }
+    .kpi-card:first-child { border-radius: 12px 0 0 12px; }
+    .kpi-card:last-child  { border-radius: 0 12px 12px 0; }
+    .kpi-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .kpi-value {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 40px;
+      color: var(--ink);
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .kpi-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 500;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 9999px;
+    }
+    .kpi-badge.red    { background: var(--red-bg);    color: var(--red-ink); }
+    .kpi-badge.yellow { background: var(--yellow-bg); color: var(--yellow-ink); }
+    .kpi-badge.green  { background: var(--green-bg);  color: var(--green-ink); }
+    .kpi-badge.blue   { background: var(--blue-bg);   color: var(--blue-ink); }
+
+    /* ─── Two-column layout ─── */
+    .cols {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 860px) {
+      .cols { grid-template-columns: 1fr; }
+      .kpi-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      .main { padding: 32px 16px 80px; }
+      .topbar { padding: 0 16px; }
+      .kpi-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ─── Panel ─── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 20px 24px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+    .panel-action {
+      font-size: 11px;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background .15s, color .15s;
+      display: flex; align-items: center; gap: 4px;
+      font-family: var(--font-sans);
+    }
+    .panel-action:hover { background: var(--bg); color: var(--ink); }
+
+    /* ─── Stock table ─── */
+    .stock-table { width: 100%; border-collapse: collapse; }
+    .stock-table thead tr {
+      border-bottom: 1px solid var(--border);
+    }
+    .stock-table th {
+      background: #1e2026;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      padding: 10px 24px;
+      text-align: left;
+    }
+    .stock-table th:last-child { text-align: right; }
+    .stock-table tbody tr {
+      border-bottom: 1px solid var(--border-2);
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .stock-table tbody tr:last-child { border-bottom: none; }
+    .stock-table tbody tr:hover { background: var(--bg); }
+    .stock-table td {
+      padding: 13px 24px;
+      font-size: 13px;
+      color: var(--ink-2);
+    }
+    .stock-table td:last-child { text-align: right; }
+    .product-name { font-weight: 500; color: var(--ink); }
+    .product-id   {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+    .qty-num {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+    }
+    .qty-unit { font-size: 11px; color: var(--muted); margin-left: 3px; }
+
+    /* Lot expand row */
+    .lot-expand-row td {
+      padding: 0 24px;
+      background: var(--bg);
+    }
+    .lot-expand-inner {
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+    }
+    .lot-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-2);
+      font-size: 12px;
+      color: var(--ink-2);
+    }
+    .lot-line:last-child { border-bottom: none; }
+    .lot-line-left { display: flex; align-items: center; gap: 10px; }
+    .lot-no-txt {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .lot-exp { color: var(--muted); font-size: 11px; }
+    .lot-qty { font-weight: 500; color: var(--ink); }
+
+    /* ─── Expiry list ─── */
+    .expiry-list { }
+    .expiry-item {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border-2);
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    }
+    .expiry-item:last-child { border-bottom: none; }
+    .expiry-name { font-size: 13px; font-weight: 500; color: var(--ink); }
+    .expiry-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .expiry-badge {
+      flex-shrink: 0;
+      font-size: 10px; font-weight: 500;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      white-space: nowrap;
+    }
+    .expiry-badge.expired { background: var(--red-bg);    color: var(--red-ink); }
+    .expiry-badge.warn    { background: var(--yellow-bg); color: var(--yellow-ink); }
+
+    /* ─── Transaction log ─── */
+    .txn-list { }
+    .txn-item {
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border-2);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .txn-item:last-child { border-bottom: none; }
+    .txn-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .txn-icon.receive { background: var(--green-bg); color: var(--green-ink); }
+    .txn-icon.issue   { background: var(--blue-bg);  color: var(--blue-ink); }
+    .txn-icon.count   { background: var(--yellow-bg);color: var(--yellow-ink); }
+    .txn-body { flex: 1; min-width: 0; }
+    .txn-product { font-size: 12px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .txn-detail  { font-size: 11px; color: var(--muted); }
+    .txn-time    { font-family: var(--font-mono); font-size: 10px; color: var(--muted); flex-shrink: 0; }
+
+    /* ─── Empty state ─── */
+    .empty-state {
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .empty-state i { font-style: normal; font-size: 24px; display: block; margin-bottom: 8px; opacity: .8; }
+
+    /* ─── Loading skeleton ─── */
+    .skel {
+      background: linear-gradient(90deg, #1e2026 25%, #2b3139 50%, #1e2026 75%);
+      background-size: 200% 100%;
+      animation: skel-shimmer 1.4s infinite;
+      border-radius: 4px;
+    }
+    @keyframes skel-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ─── Scroll entry ─── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 600ms cubic-bezier(.16,1,.3,1), transform 600ms cubic-bezier(.16,1,.3,1);
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+
+    /* ─── Misc ─── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+    .tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 500;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 9999px;
+      background: var(--bg); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    /* ─── Search input ─── */
+    .search-wrap {
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .search-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      color: var(--ink-2);
+      outline: none;
+      transition: border-color .15s;
+    }
+    .search-input::placeholder { color: var(--muted); }
+    .search-input:focus { border-color: #bbb; }
+
+    /* ─── Ambient bg blob (hero area) ─── */
+    .ambient {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+    }
+    .ambient-blob {
+      position: absolute;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(251,243,219,0.5) 0%, transparent 70%);
+      top: -200px; right: -100px;
+      animation: blob-drift 25s ease-in-out infinite alternate;
+      opacity: 0.6;
+    }
+    @keyframes blob-drift {
+      0%   { transform: translate(0,0) scale(1); }
+      100% { transform: translate(40px, 60px) scale(1.08); }
+    }
+
+    /* ─── Button ─── */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--ink); color: #fff;
+      border: none; border-radius: 5px;
+      padding: 10px 18px;
+      font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      text-decoration: none;
+    }
+    .btn-primary:hover  { background: #333; }
+    .btn-primary:active { transform: scale(.98); }
+  </style>
+</head>
+<body>
+
+<!-- Ambient light -->
+<div class="ambient" aria-hidden="true">
+  <div class="ambient-blob"></div>
+</div>
+
+<!-- ─── Topbar ─── -->
+<header class="topbar">
+  <a class="topbar-brand" href="#">TJ Inventory</a>
+  <div class="topbar-right">
+    <span class="last-updated" id="lastUpdated">—</span>
+    <a class="topbar-app-link" href="index.html">
+      <span style="vertical-align:-2px; margin-right:4px;">📤</span>เปิดหน้าเบิก/รับเข้า
+    </a>
+  </div>
+</header>
+
+<!-- ─── Main ─── -->
+<main class="main" style="position:relative; z-index:1;">
+
+  <!-- ── Page header ── -->
+  <div class="reveal" style="margin-bottom:40px;">
+    <p class="section-label">ภาพรวมสต๊อก · อัปเดตอัตโนมัติ</p>
+    <h1 class="section-heading">
+      สินค้าคงคลัง<br><em>TJ Construction</em>
+    </h1>
+  </div>
+
+  <!-- ── KPI Row ── -->
+  <div class="kpi-grid reveal" style="--delay:0ms">
+    <!-- Total in stock -->
+    <div class="kpi-card">
+      <div class="kpi-label">
+        <span style="font-size:13px;">📦</span>
+        สต๊อกรวมทั้งหมด
+      </div>
+      <div class="kpi-value" id="kpiTotal">—</div>
+      <div class="kpi-sub" id="kpiTotalSub">กำลังโหลด...</div>
+    </div>
+
+    <!-- Products count -->
+    <div class="kpi-card">
+      <div class="kpi-label">
+        <span style="font-size:13px;">💧</span>
+        ชนิดน้ำยา
+      </div>
+      <div class="kpi-value" id="kpiProducts">—</div>
+      <div class="kpi-sub">ชนิดในระบบ</div>
+    </div>
+
+    <!-- Expiring soon -->
+    <div class="kpi-card">
+      <div class="kpi-label">
+        <span style="font-size:13px;">⚠️</span>
+        ใกล้หมดอายุ
+      </div>
+      <div class="kpi-value" id="kpiWarn">—</div>
+      <div class="kpi-sub" id="kpiWarnSub">ล็อต ≤ 60 วัน</div>
+    </div>
+
+    <!-- Expired -->
+    <div class="kpi-card">
+      <div class="kpi-label">
+        <span style="font-size:13px;">❌</span>
+        หมดอายุแล้ว
+      </div>
+      <div class="kpi-value" id="kpiExpired">—</div>
+      <div class="kpi-sub">ล็อตที่ยังมีสินค้า</div>
+    </div>
+  </div>
+
+  <!-- ── Stock + Expiry cols ── -->
+  <div class="cols">
+
+    <!-- Stock by product -->
+    <div class="panel reveal" style="--delay:80ms">
+      <div class="panel-head">
+        <span class="panel-title">สต๊อกแยกชนิด</span>
+        <button class="panel-action" onclick="loadStock()">
+          <span>🔄</span> รีเฟรช
+        </button>
+      </div>
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="ค้นหาชนิดน้ำยา..." id="stockSearch" oninput="filterStockTable()">
+      </div>
+      <div id="stockTableWrap">
+        <div class="empty-state">
+          <i>⏳</i>
+          กำลังโหลดข้อมูล...
+        </div>
+      </div>
+    </div>
+
+    <!-- Expiring lots -->
+    <div class="panel reveal" style="--delay:160ms">
+      <div class="panel-head">
+        <span class="panel-title">ล็อตใกล้หมดอายุ</span>
+        <span class="tag" id="expiryCountTag">—</span>
+      </div>
+      <div id="expiryListWrap">
+        <div class="empty-state">
+          <i>⏳</i>
+          กำลังโหลดข้อมูล...
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <hr class="divider reveal">
+
+  <!-- ── Recent transactions (full width) ── -->
+  <div class="reveal" style="margin-bottom:24px; --delay:0ms">
+    <p class="section-label">บันทึกการเคลื่อนไหว</p>
+    <h2 class="section-heading" style="font-size:22px; margin-bottom:24px;">
+      รายการล่าสุด
+    </h2>
+  </div>
+
+  <div class="panel reveal" style="--delay:80ms">
+    <div class="panel-head">
+      <span class="panel-title">Transaction Log</span>
+      <button class="panel-action" onclick="loadTransactions()">
+        <span>🔄</span> รีเฟรช
+      </button>
+    </div>
+    <div id="txnListWrap">
+      <div class="empty-state">
+        <i>⏳</i>
+        กำลังโหลดข้อมูล...
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* ───────────────────────────────────────────
+   CONFIG — เปลี่ยน API_URL ให้ตรงกับ index.html
+   ─────────────────────────────────────────── */
+const API_URL = 'https://script.google.com/macros/s/AKfycbxpmNPzFf3s4CGMdXlEUpk_b0L6tkYxEg8sSYl7TR5yVCT16w5yCH2CXDPogF-DpjJZ/exec';
+const IS_DEMO  = /[?&]demo(=|&|$)/.test(location.search);
+
+function apiGet(action, params) {
+  if (IS_DEMO) return demoCall(action, params || {});
+  const q = new URLSearchParams(Object.assign({ action }, params || {}));
+  return fetch(API_URL + '?' + q.toString()).then(r => r.json());
+}
+
+/* ──────────────────────────────
+   DEMO DATA (เปิดด้วย ?demo)
+   ────────────────────────────── */
+function demoCall(action, params) {
+  const today = new Date();
+  const ymd = d => d.toISOString().split('T')[0];
+  const addDays = n => { const d = new Date(today); d.setDate(d.getDate() + n); return ymd(d); };
+
+  const handlers = {
+    stockByProduct() {
+      return { ok: true, total: 47, rows: [
+        { product_id: 'P0001', name: 'น้ำยาล้างคราบ A', in_stock: 13, unit_of_measure: 'ขวด' },
+        { product_id: 'P0002', name: 'น้ำยาเคลือบเงา B', in_stock: 8,  unit_of_measure: 'แกลลอน' },
+        { product_id: 'P0003', name: 'น้ำยาทำความสะอาดท่อ', in_stock: 20, unit_of_measure: 'ลัง' },
+        { product_id: 'P0004', name: 'สารป้องกันสนิม C2X', in_stock: 6,  unit_of_measure: 'ขวด' },
+        { product_id: 'P0005', name: 'น้ำยาขัดพื้น Pro',   in_stock: 0,  unit_of_measure: 'ถัง' },
+      ]};
+    },
+    stockByLot({ product_id }) {
+      const map = {
+        P0001: [
+          { lot_id:'L00012', lot_no:'LOT-2026-A', expiry_date: addDays(8),   in_stock: 5 },
+          { lot_id:'L00020', lot_no:'LOT-2027-B', expiry_date: addDays(310), in_stock: 8 },
+        ],
+        P0002: [
+          { lot_id:'L00005', lot_no:'LOT-2025-X', expiry_date: addDays(-10), in_stock: 8 },
+        ],
+        P0003: [
+          { lot_id:'L00031', lot_no:'LOT-2026-C', expiry_date: addDays(180), in_stock: 20 },
+        ],
+        P0004: [
+          { lot_id:'L00045', lot_no:'LOT-2026-D', expiry_date: addDays(55),  in_stock: 6 },
+        ],
+      };
+      return { ok: true, lots: map[product_id] || [] };
+    },
+    expiringLots() {
+      return { ok: true, warn_days: 60, expired_count: 1, warn_count: 2, rows: [
+        { product_name: 'น้ำยาเคลือบเงา B',   lot_no: 'LOT-2025-X', expiry_date: addDays(-10), in_stock: 8,  days_left: -10, level: 'expired' },
+        { product_name: 'น้ำยาล้างคราบ A',    lot_no: 'LOT-2026-A', expiry_date: addDays(8),   in_stock: 5,  days_left: 8,   level: 'warn'    },
+        { product_name: 'สารป้องกันสนิม C2X', lot_no: 'LOT-2026-D', expiry_date: addDays(55),  in_stock: 6,  days_left: 55,  level: 'warn'    },
+      ]};
+    },
+    getRecentTransactions() {
+      const now = new Date();
+      const t = (minsAgo, type, product, bc, user) => ({
+        txn_id: 'T' + Math.floor(Math.random()*999999).toString().padStart(8,'0'),
+        type, product_name: product, unit_barcode: bc, user,
+        timestamp: new Date(now - minsAgo*60000).toISOString(),
+        qty: 1,
+      });
+      return { ok: true, transactions: [
+        t(3,   'issue',   'น้ำยาล้างคราบ A',    '00000031', 'สมชาย'),
+        t(12,  'issue',   'น้ำยาเคลือบเงา B',   '00000028', 'สมชาย'),
+        t(45,  'receive', 'สารป้องกันสนิม C2X', '00000045', 'admin'),
+        t(90,  'issue',   'น้ำยาล้างคราบ A',    '00000029', 'สมชาย'),
+        t(130, 'receive', 'น้ำยาทำความสะอาดท่อ','00000040', 'admin'),
+        t(200, 'issue',   'น้ำยาเคลือบเงา B',   '00000021', 'สมชาย'),
+        t(300, 'count',   'ทั้งหมด',             '',         'admin'),
+      ]};
+    },
+  };
+  return new Promise(resolve => setTimeout(() => {
+    const h = handlers[action];
+    resolve(h ? h(params) : { ok: false, error: 'demo: unknown ' + action });
+  }, 220));
+}
+
+/* ──────────────────────────────
+   STATE
+   ────────────────────────────── */
+let stockRows   = [];
+let lotCache    = {};   // product_id → lots[]
+
+/* ──────────────────────────────
+   KPI
+   ────────────────────────────── */
+function updateKPI(stockRes, expiryRes) {
+  if (stockRes && stockRes.ok) {
+    document.getElementById('kpiTotal').textContent    = stockRes.total ?? '—';
+    document.getElementById('kpiProducts').textContent = (stockRes.rows || []).length;
+    document.getElementById('kpiTotalSub').textContent =
+      (stockRes.rows || []).filter(r => r.in_stock > 0).length + ' ชนิดมีสต๊อก';
+  }
+  if (expiryRes && expiryRes.ok) {
+    const warnEl    = document.getElementById('kpiWarn');
+    const expiredEl = document.getElementById('kpiExpired');
+    warnEl.textContent    = expiryRes.warn_count    ?? '—';
+    expiredEl.textContent = expiryRes.expired_count ?? '—';
+    if (expiryRes.expired_count > 0) expiredEl.style.color = 'var(--red-ink)';
+    if (expiryRes.warn_count    > 0) warnEl.style.color    = 'var(--yellow-ink)';
+  }
+}
+
+/* ──────────────────────────────
+   STOCK TABLE
+   ────────────────────────────── */
+function loadStock() {
+  document.getElementById('stockTableWrap').innerHTML = skeletonRows(5);
+  apiGet('stockByProduct')
+    .then(res => {
+      if (!res || !res.ok) { showError('stockTableWrap', res?.error); return; }
+      stockRows = res.rows || [];
+      renderStockTable(stockRows);
+      apiGet('expiringLots').then(er => updateKPI(res, er)).catch(() => updateKPI(res, null));
+    })
+    .catch(e => showError('stockTableWrap', e.message));
+}
+
+function renderStockTable(rows) {
+  if (!rows.length) {
+    document.getElementById('stockTableWrap').innerHTML =
+      `<div class="empty-state"><i>📭</i>ยังไม่มีสต๊อกในระบบ</div>`;
+    return;
+  }
+  const tbody = rows.map((r, i) => `
+    <tr onclick="toggleLots('${r.product_id}', ${i})" data-name="${(r.name||'').toLowerCase()}" style="--index:${i}">
+      <td>
+        <div class="product-name">${esc(r.name)}</div>
+        <div class="product-id">${esc(r.product_id)}</div>
+      </td>
+      <td><span class="tag">${esc(r.unit_of_measure || '—')}</span></td>
+      <td>
+        <span class="qty-num">${r.in_stock}</span>
+        <span class="qty-unit">ชิ้น</span>
+      </td>
+    </tr>
+    <tr class="lot-expand-row hidden" id="lot-row-${r.product_id}">
+      <td colspan="3">
+        <div class="lot-expand-inner" id="lot-inner-${r.product_id}">
+          <div class="empty-state" style="padding:12px 0; font-size:11px;">กำลังโหลดรายล็อต...</div>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  document.getElementById('stockTableWrap').innerHTML = `
+    <table class="stock-table">
+      <thead>
+        <tr>
+          <th>ชนิดน้ำยา</th>
+          <th>หน่วย</th>
+          <th>คงเหลือ</th>
+        </tr>
+      </thead>
+      <tbody>${tbody}</tbody>
+    </table>
+  `;
+  // stagger entry
+  document.querySelectorAll('.stock-table tbody tr:not(.lot-expand-row)').forEach((tr, i) => {
+    tr.style.opacity = '0';
+    tr.style.transform = 'translateY(6px)';
+    tr.style.transition = `opacity 400ms ${i * 50}ms ease, transform 400ms ${i * 50}ms ease`;
+    requestAnimationFrame(() => {
+      tr.style.opacity  = '1';
+      tr.style.transform = 'none';
+    });
+  });
+}
+
+function toggleLots(pid, rowIdx) {
+  const lotRow   = document.getElementById('lot-row-' + pid);
+  const lotInner = document.getElementById('lot-inner-' + pid);
+  if (!lotRow) return;
+
+  const isOpen = !lotRow.classList.contains('hidden');
+  if (isOpen) { lotRow.classList.add('hidden'); return; }
+
+  lotRow.classList.remove('hidden');
+  if (lotCache[pid]) { renderLotInner(lotInner, lotCache[pid]); return; }
+
+  apiGet('stockByLot', { product_id: pid })
+    .then(res => {
+      if (!res || !res.ok) { lotInner.innerHTML = `<div class="empty-state" style="padding:8px 0;font-size:11px;color:var(--red-ink);">โหลดไม่ได้: ${res?.error||''}</div>`; return; }
+      lotCache[pid] = res.lots || [];
+      renderLotInner(lotInner, lotCache[pid]);
+    })
+    .catch(e => { lotInner.innerHTML = `<div class="empty-state" style="padding:8px 0;font-size:11px;">ผิดพลาด: ${e.message}</div>`; });
+}
+
+function renderLotInner(el, lots) {
+  if (!lots.length) { el.innerHTML = `<div class="empty-state" style="padding:8px 0;font-size:11px;">— ไม่มีล็อต —</div>`; return; }
+  el.innerHTML = lots.map(l => {
+    const dl = daysLeft(l.expiry_date);
+    let badge = '';
+    if (dl !== null) {
+      if      (dl <  0)  badge = `<span class="expiry-badge expired">หมดอายุ ${Math.abs(dl)} วัน</span>`;
+      else if (dl <= 60) badge = `<span class="expiry-badge warn">เหลือ ${dl} วัน</span>`;
+      else               badge = `<span style="font-size:10px;color:var(--muted)">เหลือ ${dl} วัน</span>`;
+    }
+    return `<div class="lot-line">
+      <div class="lot-line-left">
+        <span class="lot-no-txt">${esc(l.lot_no || l.lot_id)}</span>
+        <span class="lot-exp">หมดอายุ ${l.expiry_date || '—'}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="lot-qty">${l.in_stock} ชิ้น</span>
+        ${badge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterStockTable() {
+  const q = document.getElementById('stockSearch').value.trim().toLowerCase();
+  document.querySelectorAll('.stock-table tbody tr[data-name]').forEach(tr => {
+    const nm = tr.getAttribute('data-name') || '';
+    const hide = q !== '' && !nm.includes(q);
+    tr.classList.toggle('hidden', hide);
+    // also hide the lot expand row below
+    const next = tr.nextElementSibling;
+    if (next && next.classList.contains('lot-expand-row')) next.classList.toggle('hidden', hide || true);
+  });
+}
+
+/* ──────────────────────────────
+   EXPIRY LIST
+   ────────────────────────────── */
+function loadExpiry() {
+  apiGet('expiringLots')
+    .then(res => {
+      if (!res || !res.ok) { showError('expiryListWrap', res?.error); return; }
+      renderExpiryList(res);
+    })
+    .catch(e => showError('expiryListWrap', e.message));
+}
+
+function renderExpiryList(res) {
+  const tag = document.getElementById('expiryCountTag');
+  const total = (res.expired_count || 0) + (res.warn_count || 0);
+  tag.textContent = total > 0 ? total + ' ล็อต' : 'ปกติ';
+  tag.style.background = res.expired_count > 0 ? 'var(--red-bg)' : res.warn_count > 0 ? 'var(--yellow-bg)' : 'var(--green-bg)';
+  tag.style.color      = res.expired_count > 0 ? 'var(--red-ink)': res.warn_count > 0 ? 'var(--yellow-ink)': 'var(--green-ink)';
+  tag.style.border     = 'none';
+
+  if (!res.rows || !res.rows.length) {
+    document.getElementById('expiryListWrap').innerHTML =
+      `<div class="empty-state"><i>✅</i>ไม่มีล็อตใกล้หมดอายุ</div>`;
+    return;
+  }
+  document.getElementById('expiryListWrap').innerHTML = res.rows.map(r => `
+    <div class="expiry-item">
+      <div>
+        <div class="expiry-name">${esc(r.product_name)}</div>
+        <div class="expiry-meta">
+          Lot ${esc(r.lot_no || r.lot_id)} · ${esc(r.expiry_date)} · ${r.in_stock} ชิ้น
+        </div>
+      </div>
+      <span class="expiry-badge ${r.level}">
+        ${r.level === 'expired' ? 'หมด ' + Math.abs(r.days_left) + ' วัน' : 'เหลือ ' + r.days_left + ' วัน'}
+      </span>
+    </div>
+  `).join('');
+}
+
+/* ──────────────────────────────
+   TRANSACTIONS
+   ────────────────────────────── */
+function loadTransactions() {
+  document.getElementById('txnListWrap').innerHTML =
+    `<div class="empty-state"><i>⏳</i>กำลังโหลด...</div>`;
+  apiGet('getRecentTransactions', { limit: 20 })
+    .then(res => {
+      if (!res || !res.ok) { showError('txnListWrap', res?.error); return; }
+      renderTransactions(res.transactions || []);
+    })
+    .catch(e => showError('txnListWrap', e.message));
+}
+
+function renderTransactions(list) {
+  if (!list.length) {
+    document.getElementById('txnListWrap').innerHTML =
+      `<div class="empty-state"><i>📭</i>ยังไม่มีรายการ</div>`;
+    return;
+  }
+  const icons = {
+    receive: { cls: 'receive', icon: '📥' },
+    issue:   { cls: 'issue',   icon: '📤' },
+    count:   { cls: 'count',   icon: '📋' },
+  };
+  const labels = { receive: 'รับเข้า', issue: 'เบิกจ่าย', count: 'เช็คสต๊อก' };
+
+  document.getElementById('txnListWrap').innerHTML = list.map(t => {
+    const ic = icons[t.type] || icons.count;
+    const relTime = relativeTime(t.timestamp);
+    return `
+      <div class="txn-item">
+        <div class="txn-icon ${ic.cls}">
+          <span style="font-size:13px; font-style:normal;">${ic.icon}</span>
+        </div>
+        <div class="txn-body">
+          <div class="txn-product">${esc(t.product_name || '—')}</div>
+          <div class="txn-detail">
+            ${labels[t.type] || t.type}
+            ${t.unit_barcode ? `· <span style="font-family:var(--font-mono);font-size:10px;">${esc(t.unit_barcode)}</span>` : ''}
+            · ${esc(t.user || '—')}
+          </div>
+        </div>
+        <div class="txn-time">${relTime}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ──────────────────────────────
+   HELPERS
+   ────────────────────────────── */
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function daysLeft(dateStr) {
+  if (!dateStr) return null;
+  const t = Date.parse(dateStr + 'T00:00:00Z');
+  if (isNaN(t)) return null;
+  const d = new Date();
+  const todayUTC = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.round((t - todayUTC) / 86400000);
+}
+function relativeTime(iso) {
+  if (!iso) return '—';
+  const diff = Math.floor((Date.now() - Date.parse(iso)) / 1000);
+  if (diff < 60)   return diff + 'วิ';
+  if (diff < 3600) return Math.floor(diff / 60) + 'นาที';
+  if (diff < 86400)return Math.floor(diff / 3600) + 'ชม.';
+  return Math.floor(diff / 86400) + 'วัน';
+}
+function showError(id, msg) {
+  document.getElementById(id).innerHTML =
+    `<div class="empty-state" style="color:var(--red-ink);">
+       <i>❌</i>
+       ${msg ? esc(msg) : 'โหลดข้อมูลไม่ได้'}
+     </div>`;
+}
+function skeletonRows(n) {
+  return `<div style="padding:16px 24px; display:flex; flex-direction:column; gap:12px;">
+    ${Array(n).fill('').map((_,i) => `
+      <div style="display:flex; align-items:center; gap:12px; opacity:${1 - i*0.15}">
+        <div class="skel" style="height:12px; flex:2; border-radius:3px;"></div>
+        <div class="skel" style="height:12px; flex:1; border-radius:3px;"></div>
+        <div class="skel" style="height:12px; width:48px; border-radius:3px;"></div>
+      </div>`).join('')}
+  </div>`;
+}
+function updateTimestamp() {
+  const el = document.getElementById('lastUpdated');
+  const now = new Date();
+  el.textContent = 'อัปเดต ' + now.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+}
+
+/* ──────────────────────────────
+   INTERSECTION OBSERVER (reveal)
+   ────────────────────────────── */
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, { threshold: 0.08 });
+
+document.querySelectorAll('.reveal').forEach(el => {
+  const delay = el.style.getPropertyValue('--delay') || '0ms';
+  el.style.transitionDelay = delay;
+  observer.observe(el);
+});
+
+/* ──────────────────────────────
+   DEMO BANNER
+   ────────────────────────────── */
+if (IS_DEMO) {
+  const banner = document.createElement('div');
+  banner.textContent = 'โหมดทดลอง — ข้อมูลตัวอย่าง';
+  banner.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:200;background:var(--dan);color:#fff;border:1px solid var(--border);font-size:11px;font-weight:500;padding:6px 14px;border-radius:9999px;font-family:var(--font-mono);';
+  document.body.appendChild(banner);
+}
+
+/* ──────────────────────────────
+   INIT
+   ────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  updateTimestamp();
+  loadStock();
+  loadExpiry();
+  loadTransactions();
+});
+</script>
+</body>
+</html>
