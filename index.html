@@ -303,6 +303,8 @@ function applyAppText(){
 
 /* ============================================================ */
 const $ = id => document.getElementById(id);
+// [T-020] escape ทุกค่าจากผู้ใช้/ชีตก่อนฉีดเข้า innerHTML (ชื่อสินค้า/ล็อต = input คน → กัน XSS)
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let CURRENT = null;
 const recent = [];
 let busy = false;
@@ -468,9 +470,9 @@ function loadUsers(){
   const sel=$('userSel');
   apiGet('getUsers')
     .then(res=>{
-      if(!res||!res.ok){ sel.innerHTML=`<option value="">⚠️ ${(res&&res.error)||APP_TEXT.login.noUsers}</option>`; return; }
+      if(!res||!res.ok){ sel.innerHTML=`<option value="">⚠️ ${esc((res&&res.error)||APP_TEXT.login.noUsers)}</option>`; return; }
       if(!res.users.length){ sel.innerHTML=`<option value="">${APP_TEXT.login.noUsers}</option>`; return; }
-      sel.innerHTML=res.users.map(u=>`<option value="${u.user_id}">${u.display_name}</option>`).join('');
+      sel.innerHTML=res.users.map(u=>`<option value="${esc(u.user_id)}">${esc(u.display_name)}</option>`).join('');
     })
     .catch(e=>{
       sel.innerHTML=`<option value="">⚠️ โหลดรายชื่อไม่ได้</option>`;
@@ -542,7 +544,7 @@ function renderRecent(){
   if(!recent.length){ $('recent').innerHTML=`<div class="empty">${APP_TEXT.recent.empty}</div>`; return; }
   $('recent').innerHTML=recent.slice(0,10).map(r=>{
     const tm=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
-    return `<div class="item"><div class="top"><div><div class="name">${r.product_name||r.unit_barcode}</div><div class="meta">${r.unit_barcode} • ${APP_TEXT.recent.lotPrefix} ${r.lot_no||'-'}</div></div><div class="muted">${tm}</div></div></div>`;
+    return `<div class="item"><div class="top"><div><div class="name">${esc(r.product_name||r.unit_barcode)}</div><div class="meta">${esc(r.unit_barcode)} • ${APP_TEXT.recent.lotPrefix} ${esc(r.lot_no||'-')}</div></div><div class="muted">${tm}</div></div></div>`;
   }).join('');
 }
 
@@ -598,7 +600,7 @@ function renderProductDropdown(list){
   const sel=$('recvProductSel');
   if(!list||!list.length){ sel.innerHTML='<option value="">— ยังไม่มีชนิดน้ำยา —</option>'; return; }
   sel.innerHTML='<option value="">— เลือกชนิด —</option>'+
-    list.map(p=>`<option value="${p.product_id}">${p.name} (${p.unit_of_measure})</option>`).join('');
+    list.map(p=>`<option value="${esc(p.product_id)}">${esc(p.name)} (${esc(p.unit_of_measure)})</option>`).join('');
 }
 
 function scanVendorBarcode(){
@@ -697,12 +699,12 @@ function doReceive(){
 function renderReceiveResult(res){
   $('recvResultBody').innerHTML=
     `<div class="item">
-       <div class="name">${res.product_name||res.product_id}</div>
-       <div class="meta">Lot ${res.lot_id} &nbsp;·&nbsp; รับเข้า ${res.unit_barcodes.length} ชิ้น &nbsp;·&nbsp; txn ${res.txn_id}</div>
+       <div class="name">${esc(res.product_name||res.product_id)}</div>
+       <div class="meta">Lot ${esc(res.lot_id)} &nbsp;·&nbsp; รับเข้า ${res.unit_barcodes.length} ชิ้น &nbsp;·&nbsp; txn ${esc(res.txn_id)}</div>
      </div>
      <div style="margin-top:10px">
        <div class="muted" style="margin-bottom:4px">unit_barcode ที่สร้าง:</div>
-       <div class="monospace">${res.unit_barcodes.join('<br>')}</div>
+       <div class="monospace">${res.unit_barcodes.map(esc).join('<br>')}</div>
      </div>`;
   $('printBtn').textContent='🖨️ พิมพ์ฉลาก '+res.unit_barcodes.length+' ดวง';
   $('recvResult').classList.remove('hidden');
@@ -759,7 +761,7 @@ const LABEL_CSS=[
 
 // สร้าง .label หนึ่งใบ — item = {name, exp (ข้อความเต็มเช่น "EXP 04/06/69" หรือ ''), code}
 function buildLabelItem(item){
-  const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  // [T-020] ใช้ esc() กลาง (top-level) แทน local
   // Code128 — เต็มความกว้าง แท่งอ้วน ; margin 20 (=10 โมดูล) = quiet zone ครบสเปก
   // preserveAspectRatio=none → ยืดเต็ม 100% × ความสูงคงที่ (ไม่ letterbox จนแท่งแคบ)
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -871,12 +873,14 @@ function renderStock(res){
   if(!stockData.length){ $('stockList').innerHTML=`<div class="empty">ยังไม่มีสต๊อกในระบบ</div>`; return; }
   $('stockList').innerHTML=stockData.map(r=>{
     const nm=String(r.name||'');
-    return `<div class="item stock-row ${r.in_stock<=0?'zero':''}" data-name="${nm.toLowerCase()}">
-      <div class="top" onclick="toggleStockLots('${r.product_id}')">
-        <div><div class="name">${nm}</div><div class="meta">${r.product_id}</div></div>
+    // [T-020] pid เข้า onclick (string ใน JS) → sanitize เหลือ [\w-] (HTML-escape อย่างเดียวไม่พอ เพราะ browser ถอด entity ก่อน parse JS)
+    const pid=String(r.product_id||'').replace(/[^\w-]/g,'');
+    return `<div class="item stock-row ${r.in_stock<=0?'zero':''}" data-name="${esc(nm.toLowerCase())}">
+      <div class="top" onclick="toggleStockLots('${pid}')">
+        <div><div class="name">${esc(nm)}</div><div class="meta">${esc(r.product_id)}</div></div>
         <div class="stock-qty"><b>${r.in_stock}</b> <span class="muted">ชิ้น</span> <span class="chev">▾</span></div>
       </div>
-      <div class="lot-detail hidden" id="lots-${r.product_id}"></div>
+      <div class="lot-detail hidden" id="lots-${pid}"></div>
     </div>`;
   }).join('');
 }
@@ -895,7 +899,7 @@ function toggleStockLots(pid){
       box.dataset.loaded='1';
       box.innerHTML=renderLots(res.lots);
     })
-    .catch(e=>{ box.innerHTML='<div class="muted">ผิดพลาด: '+e.message+'</div>'; });
+    .catch(e=>{ box.innerHTML='<div class="muted">ผิดพลาด: '+esc(e.message)+'</div>'; });
 }
 
 // days_left คำนวณฝั่ง client (UTC midnight กัน timezone — เหมือน backend SCHEMA §4.6)
@@ -917,8 +921,8 @@ function renderLots(lots){
       else            tag=`<span class="muted">เหลือ ${dl} วัน</span>`;
     }
     return `<div class="lot-line">
-      <div><span class="lot-no">${l.lot_no||l.lot_id}</span>
-        <span class="muted">· หมดอายุ ${l.expiry_date||'-'}</span></div>
+      <div><span class="lot-no">${esc(l.lot_no||l.lot_id)}</span>
+        <span class="muted">· หมดอายุ ${esc(l.expiry_date||'-')}</span></div>
       <div class="lot-right"><b>${l.in_stock}</b> <span class="muted">ชิ้น</span> ${tag}</div>
     </div>`;
   }).join('');
@@ -957,8 +961,8 @@ function renderExpiry(res){
       ? `<span class="badge expired">หมดอายุแล้ว ${Math.abs(r.days_left)} วัน</span>`
       : `<span class="badge warn">เหลือ ${r.days_left} วัน</span>`;
     return `<div class="item ${r.level}"><div class="top">
-      <div><div class="name">${r.product_name}</div>
-      <div class="meta">Lot ${r.lot_no||r.lot_id} • หมดอายุ ${r.expiry_date} • คงเหลือ ${r.in_stock} ชิ้น</div></div>
+      <div><div class="name">${esc(r.product_name)}</div>
+      <div class="meta">Lot ${esc(r.lot_no||r.lot_id)} • หมดอายุ ${esc(r.expiry_date)} • คงเหลือ ${r.in_stock} ชิ้น</div></div>
       ${badge}</div></div>`;
   }).join('');
 }
