@@ -151,10 +151,10 @@
 
   <!-- Tab bar -->
   <div class="tabbar">
-    <button id="tab-btn-issue"   class="tab-btn active" onclick="showTab('issue')">📤 เบิก</button>
-    <button id="tab-btn-receive" class="tab-btn"        onclick="showTab('receive')">📥 รับเข้า</button>
-    <button id="tab-btn-stock"   class="tab-btn"        onclick="showTab('stock')">📊 สต๊อก</button>
-    <button id="tab-btn-expiry"  class="tab-btn"        onclick="showTab('expiry')">⏰ หมดอายุ</button>
+    <button id="tab-btn-issue"   class="tab-btn active" onclick="showTab('issue')"   data-text="tabs.issue">📤 เบิก</button>
+    <button id="tab-btn-receive" class="tab-btn"        onclick="showTab('receive')" data-text="tabs.receive">📥 รับเข้า</button>
+    <button id="tab-btn-stock"   class="tab-btn"        onclick="showTab('stock')"   data-text="tabs.stock">📊 สต๊อก</button>
+    <button id="tab-btn-expiry"  class="tab-btn"        onclick="showTab('expiry')"  data-text="tabs.expiry">⏰ หมดอายุ</button>
   </div>
 
   <!-- ===== Tab: เบิกจ่าย ===== -->
@@ -180,48 +180,48 @@
 
     <!-- Card 1: เลือกชนิด -->
     <div class="card">
-      <h2>📦 เลือกชนิดน้ำยา</h2>
+      <h2 data-text="receive.productTitle">📦 เลือกชนิดน้ำยา</h2>
       <div class="scanbox">
-        <label>ยิง barcode กล่อง (ค้นหาชนิดอัตโนมัติ)</label>
-        <input id="recvVbcInput" autocomplete="off" placeholder="ยิง / พิมพ์ barcode กล่อง แล้ว Enter">
+        <label data-text="receive.vbcLabel">ยิง barcode กล่อง (ค้นหาชนิดอัตโนมัติ)</label>
+        <input id="recvVbcInput" autocomplete="off" data-text-placeholder="receive.vbcPlaceholder" placeholder="ยิง / พิมพ์ barcode กล่อง แล้ว Enter">
       </div>
-      <label>หรือเลือกจากรายการ</label>
+      <label data-text="receive.pickLabel">หรือเลือกจากรายการ</label>
       <select id="recvProductSel">
-        <option value="">— กำลังโหลด... —</option>
+        <option value="" data-text="receive.loadingProducts">— กำลังโหลด... —</option>
       </select>
-      <button class="ghost" style="margin-top:10px" onclick="toggleNewProduct()">➕ สร้างชนิดใหม่</button>
+      <button class="ghost" style="margin-top:10px" onclick="toggleNewProduct()" data-text="receive.newProductBtn">➕ สร้างชนิดใหม่</button>
 
       <!-- ฟอร์มชนิดใหม่ (hidden จนกว่าจะกด) -->
       <div id="newProductForm" class="hidden">
         <hr class="div">
-        <div class="sub-label">ชนิดใหม่ — กรอกข้อมูลด้านล่าง</div>
-        <label>ชื่อน้ำยา *</label>
-        <input id="newProductName" autocomplete="off" placeholder="เช่น น้ำยาล้างคราบ A">
-        <label>หน่วยนับ *</label>
-        <input id="newProductUom" autocomplete="off" placeholder="เช่น ขวด / แกลลอน / ลัง">
-        <label>barcode กล่อง (vendor) — ถ้ามี</label>
-        <input id="newProductVbc" autocomplete="off" placeholder="barcode ข้างกล่องจากผู้ขาย (optional)">
+        <div class="sub-label" data-text="receive.newProductHead">ชนิดใหม่ — กรอกข้อมูลด้านล่าง</div>
+        <label data-text="receive.nameLabel">ชื่อน้ำยา *</label>
+        <input id="newProductName" autocomplete="off" data-text-placeholder="receive.namePlaceholder" placeholder="เช่น น้ำยาล้างคราบ A">
+        <label data-text="receive.uomLabel">หน่วยนับ *</label>
+        <input id="newProductUom" autocomplete="off" data-text-placeholder="receive.uomPlaceholder" placeholder="เช่น ขวด / แกลลอน / ลัง">
+        <label data-text="receive.newVbcLabel">barcode กล่อง (vendor) — ถ้ามี</label>
+        <input id="newProductVbc" autocomplete="off" data-text-placeholder="receive.newVbcPlaceholder" placeholder="barcode ข้างกล่องจากผู้ขาย (optional)">
       </div>
     </div>
 
     <!-- Card 2: รายละเอียดล็อต -->
     <div class="card">
-      <h2>📋 รายละเอียดล็อต</h2>
-      <label>เลขล็อต (ข้างกล่อง) — ถ้ามี</label>
-      <input id="recvLotNo" autocomplete="off" placeholder="เช่น LOT-2026-A">
-      <label>วันหมดอายุ *</label>
+      <h2 data-text="receive.lotTitle">📋 รายละเอียดล็อต</h2>
+      <label data-text="receive.lotNoLabel">เลขล็อต (ข้างกล่อง) — ถ้ามี</label>
+      <input id="recvLotNo" autocomplete="off" data-text-placeholder="receive.lotNoPlaceholder" placeholder="เช่น LOT-2026-A">
+      <label data-text="receive.expiryLabel">วันหมดอายุ *</label>
       <input id="recvExpiry" type="date">
-      <label>จำนวนที่รับเข้า *</label>
+      <label data-text="receive.qtyLabel">จำนวนที่รับเข้า *</label>
       <input id="recvQty" type="number" min="1" value="1" inputmode="numeric">
-      <button id="recvBtn" class="green" onclick="doReceive()">📥 รับเข้า</button>
+      <button id="recvBtn" class="green" onclick="doReceive()" data-text="receive.submitBtn">📥 รับเข้า</button>
     </div>
 
     <!-- Card 3: ผลลัพธ์ (hidden จนกว่าสำเร็จ) -->
     <div id="recvResult" class="card hidden">
-      <h2>✅ รับเข้าสำเร็จ</h2>
+      <h2 data-text="receive.resultTitle">✅ รับเข้าสำเร็จ</h2>
       <div id="recvResultBody"></div>
-      <button class="green" id="printBtn" onclick="printLabels()">🖨️ พิมพ์ฉลาก</button>
-      <button class="ghost" onclick="resetReceive()" style="margin-top:8px">🔄 รับเข้าชุดถัดไป</button>
+      <button class="green" id="printBtn" onclick="printLabels()" data-text="receive.printBtn">🖨️ พิมพ์ฉลาก</button>
+      <button class="ghost" onclick="resetReceive()" style="margin-top:8px" data-text="receive.nextBtn">🔄 รับเข้าชุดถัดไป</button>
     </div>
 
   </section>
@@ -229,9 +229,10 @@
   <!-- ===== Tab: เช็คสต๊อก (T-016) ===== -->
   <section id="tab-stock" class="wrap hidden">
     <div class="card">
-      <h2>📊 สต๊อกคงเหลือ <button class="ghost sm" style="margin-left:auto" onclick="initStockTab()">🔄 รีเฟรช</button></h2>
-      <input id="stockSearch" autocomplete="off" placeholder="🔍 ค้นหาชนิดน้ำยา..." oninput="filterStock()">
-      <div id="stockSummary" class="muted" style="margin:10px 0">กำลังโหลด...</div>
+      <!-- title หุ้ม span เพราะ data-text เซ็ต textContent — ใส่บน h2 ตรงๆ จะลบปุ่มรีเฟรชข้างใน -->
+      <h2><span data-text="stock.title">📊 สต๊อกคงเหลือ</span> <button class="ghost sm" style="margin-left:auto" onclick="initStockTab()" data-text="stock.refreshBtn">🔄 รีเฟรช</button></h2>
+      <input id="stockSearch" autocomplete="off" data-text-placeholder="stock.searchPlaceholder" placeholder="🔍 ค้นหาชนิดน้ำยา..." oninput="filterStock()">
+      <div id="stockSummary" class="muted" style="margin:10px 0" data-text="common.loading">กำลังโหลด...</div>
       <div id="stockList"></div>
     </div>
   </section>
@@ -239,8 +240,8 @@
   <!-- ===== Tab: ใกล้หมดอายุ (FEFO — T-009) ===== -->
   <section id="tab-expiry" class="wrap hidden">
     <div class="card">
-      <h2>⏰ ล็อตใกล้หมดอายุ <button class="ghost sm" style="margin-left:auto" onclick="initExpiryTab()">🔄 รีเฟรช</button></h2>
-      <div id="expirySummary" class="muted" style="margin-bottom:10px">กำลังโหลด...</div>
+      <h2><span data-text="expiry.title">⏰ ล็อตใกล้หมดอายุ</span> <button class="ghost sm" style="margin-left:auto" onclick="initExpiryTab()" data-text="expiry.refreshBtn">🔄 รีเฟรช</button></h2>
+      <div id="expirySummary" class="muted" style="margin-bottom:10px" data-text="common.loading">กำลังโหลด...</div>
       <div id="expiryList"></div>
     </div>
   </section>
@@ -290,7 +291,90 @@ const APP_TEXT = {
     lotPrefix: 'Lot',
   },
   cam: { openFailTpl: 'เปิดกล้องไม่ได้: {msg}' },
-  common: { errorTpl: 'ผิดพลาด: {msg}' },
+  common: {
+    errorTpl: 'ผิดพลาด: {msg}',
+    loading:  'กำลังโหลด...',
+    loadFail: 'โหลดไม่สำเร็จ',
+  },
+  tabs: {
+    issue:   '📤 เบิก',
+    receive: '📥 รับเข้า',
+    stock:   '📊 สต๊อก',
+    expiry:  '⏰ หมดอายุ',
+  },
+  // badge อายุล็อต — ใช้ร่วมแท็บสต๊อก + หมดอายุ (T-022: เกณฑ์มาจาก Config จุดเดียว)
+  badge: {
+    expiredTpl: 'หมดอายุแล้ว {n} วัน',
+    warnTpl:    'เหลือ {n} วัน',
+    leftTpl:    'เหลือ {n} วัน',
+  },
+  receive: {
+    productTitle:       '📦 เลือกชนิดน้ำยา',
+    vbcLabel:           'ยิง barcode กล่อง (ค้นหาชนิดอัตโนมัติ)',
+    vbcPlaceholder:     'ยิง / พิมพ์ barcode กล่อง แล้ว Enter',
+    pickLabel:          'หรือเลือกจากรายการ',
+    loadingProducts:    '— กำลังโหลด... —',
+    noProducts:         '— ยังไม่มีชนิดน้ำยา —',
+    pickProduct:        '— เลือกชนิด —',
+    loadProductsFailTpl:'โหลดชนิดน้ำยาไม่ได้: {msg}',
+    newProductBtn:      '➕ สร้างชนิดใหม่',
+    newProductHead:     'ชนิดใหม่ — กรอกข้อมูลด้านล่าง',
+    nameLabel:          'ชื่อน้ำยา *',
+    namePlaceholder:    'เช่น น้ำยาล้างคราบ A',
+    uomLabel:           'หน่วยนับ *',
+    uomPlaceholder:     'เช่น ขวด / แกลลอน / ลัง',
+    newVbcLabel:        'barcode กล่อง (vendor) — ถ้ามี',
+    newVbcPlaceholder:  'barcode ข้างกล่องจากผู้ขาย (optional)',
+    lotTitle:           '📋 รายละเอียดล็อต',
+    lotNoLabel:         'เลขล็อต (ข้างกล่อง) — ถ้ามี',
+    lotNoPlaceholder:   'เช่น LOT-2026-A',
+    expiryLabel:        'วันหมดอายุ *',
+    qtyLabel:           'จำนวนที่รับเข้า *',
+    submitBtn:          '📥 รับเข้า',
+    searchFail:         'ค้นหาไม่ได้',
+    searchFailTpl:      'ค้นหาไม่ได้: {msg}',
+    notFound:           'ไม่พบชนิดนี้ — กรุณากรอกชนิดใหม่',
+    foundTpl:           'พบ: {name}',
+    foundManyTpl:       'พบ {n} ชนิด — กรุณาเลือก',
+    needExpiry:         'กรุณาระบุวันหมดอายุ',
+    needQty:            'กรุณาระบุจำนวน ≥ 1',
+    needName:           'กรุณาใส่ชื่อน้ำยา',
+    needUom:            'กรุณาใส่หน่วยนับ',
+    needProduct:        'กรุณาเลือกชนิดน้ำยา',
+    failed:             'รับเข้าไม่สำเร็จ',
+    okTpl:              '✅ รับเข้า {n} ชิ้น สำเร็จ',
+    resultTitle:        '✅ รับเข้าสำเร็จ',
+    resultMetaTpl:      'Lot {lot} &nbsp;·&nbsp; รับเข้า {n} ชิ้น &nbsp;·&nbsp; txn {txn}',
+    barcodeListHead:    'unit_barcode ที่สร้าง:',
+    printBtn:           '🖨️ พิมพ์ฉลาก',
+    printBtnTpl:        '🖨️ พิมพ์ฉลาก {n} ดวง',
+    nextBtn:            '🔄 รับเข้าชุดถัดไป',
+  },
+  print: {
+    noLabels:   'ไม่มีฉลากให้พิมพ์',
+    libMissing: 'โหลดตัวสร้าง barcode ไม่ได้ (เช็กเน็ต)',
+    failTpl:    'พิมพ์ไม่สำเร็จ: {msg}',
+  },
+  stock: {
+    title:             '📊 สต๊อกคงเหลือ',
+    refreshBtn:        '🔄 รีเฟรช',
+    searchPlaceholder: '🔍 ค้นหาชนิดน้ำยา...',
+    summaryTpl:        'รวม <b>{total}</b> ชิ้น ใน <b>{kinds}</b> ชนิด',
+    empty:             'ยังไม่มีสต๊อกในระบบ',
+    unit:              'ชิ้น',
+    lotsLoading:       'กำลังโหลดรายล็อต...',
+    lotsLoadFail:      'โหลดรายล็อตไม่ได้',
+    lotsHead:          'รายล็อต (หมดอายุก่อน → หลัง)',
+    noLots:            '— ไม่มีล็อต —',
+    lotExpiryTpl:      '· หมดอายุ {exp}',
+  },
+  expiry: {
+    title:      '⏰ ล็อตใกล้หมดอายุ',
+    refreshBtn: '🔄 รีเฟรช',
+    summaryTpl: 'เกณฑ์เตือน ≤ <b>{warn}</b> วัน &nbsp;·&nbsp; 🔴 หมดอายุแล้ว <b>{expired}</b> &nbsp;·&nbsp; 🟡 ใกล้หมด <b>{warnCount}</b>',
+    emptyTpl:   '🎉 ไม่มีล็อตใกล้หมดอายุ (ภายใน {warn} วัน)',
+    metaTpl:    'Lot {lot} • หมดอายุ {exp} • คงเหลือ {n} ชิ้น',
+  },
 };
 
 function t(path){ return path.split('.').reduce((o,k)=>(o&&o[k]!==undefined)?o[k]:undefined, APP_TEXT); }
@@ -593,13 +677,13 @@ function initReceiveTab(){
       recvProducts=(res&&res.ok)?res.products:[];
       renderProductDropdown(recvProducts);
     })
-    .catch(e=>toast('โหลดชนิดน้ำยาไม่ได้: '+e.message,false));
+    .catch(e=>toast(tf(APP_TEXT.receive.loadProductsFailTpl,{msg:e.message}),false));
 }
 
 function renderProductDropdown(list){
   const sel=$('recvProductSel');
-  if(!list||!list.length){ sel.innerHTML='<option value="">— ยังไม่มีชนิดน้ำยา —</option>'; return; }
-  sel.innerHTML='<option value="">— เลือกชนิด —</option>'+
+  if(!list||!list.length){ sel.innerHTML=`<option value="">${APP_TEXT.receive.noProducts}</option>`; return; }
+  sel.innerHTML=`<option value="">${APP_TEXT.receive.pickProduct}</option>`+
     list.map(p=>`<option value="${esc(p.product_id)}">${esc(p.name)} (${esc(p.unit_of_measure)})</option>`).join('');
 }
 
@@ -608,20 +692,20 @@ function scanVendorBarcode(){
   if(!bc) return;
   apiGet('lookupByVendorBarcode', {vendor_barcode:bc})
     .then(res=>{
-      if(!res||!res.ok){ toast(res.error||'ค้นหาไม่ได้',false); return; }
+      if(!res||!res.ok){ toast(res.error||APP_TEXT.receive.searchFail,false); return; }
       $('recvVbcInput').value='';
       if(res.products.length===0){
-        toast('ไม่พบชนิดนี้ — กรุณากรอกชนิดใหม่',false);
+        toast(APP_TEXT.receive.notFound,false);
         showNewProductForm(bc);
       } else if(res.products.length===1){
         selectProduct(res.products[0]);
-        toast('พบ: '+res.products[0].name);
+        toast(tf(APP_TEXT.receive.foundTpl,{name:res.products[0].name}));
       } else {
         renderProductDropdown(res.products);
-        toast('พบ '+res.products.length+' ชนิด — กรุณาเลือก');
+        toast(tf(APP_TEXT.receive.foundManyTpl,{n:res.products.length}));
       }
     })
-    .catch(e=>toast('ค้นหาไม่ได้: '+e.message,false));
+    .catch(e=>toast(tf(APP_TEXT.receive.searchFailTpl,{msg:e.message}),false));
 }
 
 function selectProduct(prod){
@@ -660,20 +744,20 @@ function toggleNewProduct(){
 function doReceive(){
   const expiry=$('recvExpiry').value.trim();
   const qty=Number($('recvQty').value);
-  if(!expiry){ toast('กรุณาระบุวันหมดอายุ',false); $('recvExpiry').focus(); return; }
-  if(!qty||qty<1){ toast('กรุณาระบุจำนวน ≥ 1',false); $('recvQty').focus(); return; }
+  if(!expiry){ toast(APP_TEXT.receive.needExpiry,false); $('recvExpiry').focus(); return; }
+  if(!qty||qty<1){ toast(APP_TEXT.receive.needQty,false); $('recvQty').focus(); return; }
 
   const payload={lot_no:$('recvLotNo').value.trim(), expiry_date:expiry, qty, user:CURRENT.user_id};
 
   if(isNewProduct){
     const name=$('newProductName').value.trim();
     const uom=$('newProductUom').value.trim();
-    if(!name){ toast('กรุณาใส่ชื่อน้ำยา',false); $('newProductName').focus(); return; }
-    if(!uom){ toast('กรุณาใส่หน่วยนับ',false); $('newProductUom').focus(); return; }
+    if(!name){ toast(APP_TEXT.receive.needName,false); $('newProductName').focus(); return; }
+    if(!uom){ toast(APP_TEXT.receive.needUom,false); $('newProductUom').focus(); return; }
     payload.new_product={name, unit_of_measure:uom, vendor_barcode:$('newProductVbc').value.trim()};
   } else {
     const pid=$('recvProductSel').value;
-    if(!pid){ toast('กรุณาเลือกชนิดน้ำยา',false); return; }
+    if(!pid){ toast(APP_TEXT.receive.needProduct,false); return; }
     payload.product_id=pid;
   }
 
@@ -681,8 +765,8 @@ function doReceive(){
   apiPost(Object.assign({action:'receiveForUI'}, payload))
     .then(res=>{
       $('recvBtn').disabled=false;
-      if(!res||!res.ok){ toast(res.error||'รับเข้าไม่สำเร็จ',false); return; }
-      toast('✅ รับเข้า '+res.unit_barcodes.length+' ชิ้น สำเร็จ');
+      if(!res||!res.ok){ toast(res.error||APP_TEXT.receive.failed,false); return; }
+      toast(tf(APP_TEXT.receive.okTpl,{n:res.unit_barcodes.length}));
       // เก็บข้อมูลฉลากฝั่ง client (ชื่อ/วันหมดอายุ/unit_barcode) — ครบไม่ต้องถาม server ซ้ำ
       lastReceive={
         product_name: res.product_name||res.product_id,
@@ -693,20 +777,20 @@ function doReceive(){
       };
       renderReceiveResult(res);
     })
-    .catch(e=>{ $('recvBtn').disabled=false; toast('ผิดพลาด: '+e.message,false); });
+    .catch(e=>{ $('recvBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
 }
 
 function renderReceiveResult(res){
   $('recvResultBody').innerHTML=
     `<div class="item">
        <div class="name">${esc(res.product_name||res.product_id)}</div>
-       <div class="meta">Lot ${esc(res.lot_id)} &nbsp;·&nbsp; รับเข้า ${res.unit_barcodes.length} ชิ้น &nbsp;·&nbsp; txn ${esc(res.txn_id)}</div>
+       <div class="meta">${tf(APP_TEXT.receive.resultMetaTpl,{lot:esc(res.lot_id), n:res.unit_barcodes.length, txn:esc(res.txn_id)})}</div>
      </div>
      <div style="margin-top:10px">
-       <div class="muted" style="margin-bottom:4px">unit_barcode ที่สร้าง:</div>
+       <div class="muted" style="margin-bottom:4px">${APP_TEXT.receive.barcodeListHead}</div>
        <div class="monospace">${res.unit_barcodes.map(esc).join('<br>')}</div>
      </div>`;
-  $('printBtn').textContent='🖨️ พิมพ์ฉลาก '+res.unit_barcodes.length+' ดวง';
+  $('printBtn').textContent=tf(APP_TEXT.receive.printBtnTpl,{n:res.unit_barcodes.length});
   $('recvResult').classList.remove('hidden');
 }
 
@@ -800,9 +884,9 @@ function buildLabelDoc(items){
 
 function printLabels(){
   if(!lastReceive || !lastReceive.unit_barcodes || !lastReceive.unit_barcodes.length){
-    toast('ไม่มีฉลากให้พิมพ์',false); return;
+    toast(APP_TEXT.print.noLabels,false); return;
   }
-  if(typeof JsBarcode==='undefined'){ toast('โหลดตัวสร้าง barcode ไม่ได้ (เช็กเน็ต)',false); return; }
+  if(typeof JsBarcode==='undefined'){ toast(APP_TEXT.print.libMissing,false); return; }
   // ── พิมพ์ผ่าน hidden iframe แล้วสั่ง frame.contentWindow.print() ────────────
   // สั่ง print() บน iframe ที่เราคุมเอง → @page ของ iframe ถูกใช้จริง (ไม่หมุน 90°)
   const expTxt = lastReceive.expiry ? ('EXP '+fmtExpiry(lastReceive.expiry)) : '';
@@ -823,7 +907,7 @@ function printLabels(){
   // รอ layout/วาด SVG + โหลดฟอนต์ แล้วสั่งพิมพ์จาก iframe โดยตรง
   setTimeout(function(){
     try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
-    catch(e){ toast('พิมพ์ไม่สำเร็จ: '+e.message,false); }
+    catch(e){ toast(tf(APP_TEXT.print.failTpl,{msg:e.message}),false); }
   },300);
 }
 
@@ -857,20 +941,20 @@ function initLabelPreview(){
 let stockData=[];   // rows จาก stockByProduct
 
 function initStockTab(){
-  $('stockSummary').textContent='กำลังโหลด...';
+  $('stockSummary').textContent=APP_TEXT.common.loading;
   $('stockList').innerHTML='';
   apiGet('stockByProduct')
     .then(res=>{
-      if(!res||!res.ok){ $('stockSummary').textContent=(res&&res.error)||'โหลดไม่สำเร็จ'; return; }
+      if(!res||!res.ok){ $('stockSummary').textContent=(res&&res.error)||APP_TEXT.common.loadFail; return; }
       stockData=res.rows||[];
       renderStock(res);
     })
-    .catch(e=>{ $('stockSummary').textContent='ผิดพลาด: '+e.message; });
+    .catch(e=>{ $('stockSummary').textContent=tf(APP_TEXT.common.errorTpl,{msg:e.message}); });
 }
 
 function renderStock(res){
-  $('stockSummary').innerHTML=`รวม <b>${res.total}</b> ชิ้น ใน <b>${stockData.length}</b> ชนิด`;
-  if(!stockData.length){ $('stockList').innerHTML=`<div class="empty">ยังไม่มีสต๊อกในระบบ</div>`; return; }
+  $('stockSummary').innerHTML=tf(APP_TEXT.stock.summaryTpl,{total:res.total, kinds:stockData.length});
+  if(!stockData.length){ $('stockList').innerHTML=`<div class="empty">${APP_TEXT.stock.empty}</div>`; return; }
   $('stockList').innerHTML=stockData.map(r=>{
     const nm=String(r.name||'');
     // [T-020] pid เข้า onclick (string ใน JS) → sanitize เหลือ [\w-] (HTML-escape อย่างเดียวไม่พอ เพราะ browser ถอด entity ก่อน parse JS)
@@ -878,7 +962,7 @@ function renderStock(res){
     return `<div class="item stock-row ${r.in_stock<=0?'zero':''}" data-name="${esc(nm.toLowerCase())}">
       <div class="top" onclick="toggleStockLots('${pid}')">
         <div><div class="name">${esc(nm)}</div><div class="meta">${esc(r.product_id)}</div></div>
-        <div class="stock-qty"><b>${r.in_stock}</b> <span class="muted">ชิ้น</span> <span class="chev">▾</span></div>
+        <div class="stock-qty"><b>${r.in_stock}</b> <span class="muted">${APP_TEXT.stock.unit}</span> <span class="chev">▾</span></div>
       </div>
       <div class="lot-detail hidden" id="lots-${pid}"></div>
     </div>`;
@@ -892,14 +976,14 @@ function toggleStockLots(pid){
   if(!box.classList.contains('hidden')){ box.classList.add('hidden'); row.classList.remove('open'); return; }
   row.classList.add('open'); box.classList.remove('hidden');
   if(box.dataset.loaded){ return; }
-  box.innerHTML='<div class="muted" style="padding:6px 0">กำลังโหลดรายล็อต...</div>';
+  box.innerHTML=`<div class="muted" style="padding:6px 0">${APP_TEXT.stock.lotsLoading}</div>`;
   apiGet('stockByLot',{product_id:pid})
     .then(res=>{
-      if(!res||!res.ok){ box.innerHTML='<div class="muted">โหลดรายล็อตไม่ได้</div>'; return; }
+      if(!res||!res.ok){ box.innerHTML=`<div class="muted">${APP_TEXT.stock.lotsLoadFail}</div>`; return; }
       box.dataset.loaded='1';
       box.innerHTML=renderLots(res.lots, res.warn_days);
     })
-    .catch(e=>{ box.innerHTML='<div class="muted">ผิดพลาด: '+esc(e.message)+'</div>'; });
+    .catch(e=>{ box.innerHTML=`<div class="muted">${tf(APP_TEXT.common.errorTpl,{msg:esc(e.message)})}</div>`; });
 }
 
 // days_left คำนวณฝั่ง client (UTC midnight กัน timezone — เหมือน backend SCHEMA §4.6)
@@ -911,22 +995,22 @@ function stockDaysLeft(ymd){
 }
 
 function renderLots(lots, warnDays){
-  if(!lots||!lots.length) return '<div class="muted" style="padding:6px 0">— ไม่มีล็อต —</div>';
+  if(!lots||!lots.length) return `<div class="muted" style="padding:6px 0">${APP_TEXT.stock.noLots}</div>`;
   // [T-022] เกณฑ์เตือนมาจาก backend (Config.expiry_warn_days) จุดเดียวกับหน้าหมดอายุ
   // fallback 60 เฉพาะช่วง backend ยังเป็น version เก่าที่ไม่ส่ง warn_days
   const warn=(warnDays!=null&&warnDays!=='')?Number(warnDays):60;
-  return '<div class="lot-head">รายล็อต (หมดอายุก่อน → หลัง)</div>'+lots.map(l=>{
+  return `<div class="lot-head">${APP_TEXT.stock.lotsHead}</div>`+lots.map(l=>{
     const dl=stockDaysLeft(l.expiry_date);
     let tag='';
     if(dl!=null){
-      if(dl<0)        tag=`<span class="badge expired">หมดอายุแล้ว ${Math.abs(dl)} วัน</span>`;
-      else if(dl<=warn) tag=`<span class="badge warn">เหลือ ${dl} วัน</span>`;
-      else            tag=`<span class="muted">เหลือ ${dl} วัน</span>`;
+      if(dl<0)        tag=`<span class="badge expired">${tf(APP_TEXT.badge.expiredTpl,{n:Math.abs(dl)})}</span>`;
+      else if(dl<=warn) tag=`<span class="badge warn">${tf(APP_TEXT.badge.warnTpl,{n:dl})}</span>`;
+      else            tag=`<span class="muted">${tf(APP_TEXT.badge.leftTpl,{n:dl})}</span>`;
     }
     return `<div class="lot-line">
       <div><span class="lot-no">${esc(l.lot_no||l.lot_id)}</span>
-        <span class="muted">· หมดอายุ ${esc(l.expiry_date||'-')}</span></div>
-      <div class="lot-right"><b>${l.in_stock}</b> <span class="muted">ชิ้น</span> ${tag}</div>
+        <span class="muted">${tf(APP_TEXT.stock.lotExpiryTpl,{exp:esc(l.expiry_date||'-')})}</span></div>
+      <div class="lot-right"><b>${l.in_stock}</b> <span class="muted">${APP_TEXT.stock.unit}</span> ${tag}</div>
     </div>`;
   }).join('');
 }
@@ -942,30 +1026,29 @@ function filterStock(){
 
 /* ===== ใกล้หมดอายุ (FEFO — T-009) ===== */
 function initExpiryTab(){
-  $('expirySummary').textContent='กำลังโหลด...';
+  $('expirySummary').textContent=APP_TEXT.common.loading;
   $('expiryList').innerHTML='';
   apiGet('expiringLots')
     .then(res=>{
-      if(!res||!res.ok){ $('expirySummary').textContent=(res&&res.error)||'โหลดไม่สำเร็จ'; return; }
+      if(!res||!res.ok){ $('expirySummary').textContent=(res&&res.error)||APP_TEXT.common.loadFail; return; }
       renderExpiry(res);
     })
-    .catch(e=>{ $('expirySummary').textContent='ผิดพลาด: '+e.message; });
+    .catch(e=>{ $('expirySummary').textContent=tf(APP_TEXT.common.errorTpl,{msg:e.message}); });
 }
 function renderExpiry(res){
   $('expirySummary').innerHTML=
-    `เกณฑ์เตือน ≤ <b>${res.warn_days}</b> วัน &nbsp;·&nbsp; `+
-    `🔴 หมดอายุแล้ว <b>${res.expired_count}</b> &nbsp;·&nbsp; 🟡 ใกล้หมด <b>${res.warn_count}</b>`;
+    tf(APP_TEXT.expiry.summaryTpl,{warn:res.warn_days, expired:res.expired_count, warnCount:res.warn_count});
   if(!res.rows.length){
-    $('expiryList').innerHTML=`<div class="empty">🎉 ไม่มีล็อตใกล้หมดอายุ (ภายใน ${res.warn_days} วัน)</div>`;
+    $('expiryList').innerHTML=`<div class="empty">${tf(APP_TEXT.expiry.emptyTpl,{warn:res.warn_days})}</div>`;
     return;
   }
   $('expiryList').innerHTML=res.rows.map(r=>{
     const badge = r.level==='expired'
-      ? `<span class="badge expired">หมดอายุแล้ว ${Math.abs(r.days_left)} วัน</span>`
-      : `<span class="badge warn">เหลือ ${r.days_left} วัน</span>`;
+      ? `<span class="badge expired">${tf(APP_TEXT.badge.expiredTpl,{n:Math.abs(r.days_left)})}</span>`
+      : `<span class="badge warn">${tf(APP_TEXT.badge.warnTpl,{n:r.days_left})}</span>`;
     return `<div class="item ${r.level}"><div class="top">
       <div><div class="name">${esc(r.product_name)}</div>
-      <div class="meta">Lot ${esc(r.lot_no||r.lot_id)} • หมดอายุ ${esc(r.expiry_date)} • คงเหลือ ${r.in_stock} ชิ้น</div></div>
+      <div class="meta">${tf(APP_TEXT.expiry.metaTpl,{lot:esc(r.lot_no||r.lot_id), exp:esc(r.expiry_date), n:r.in_stock})}</div></div>
       ${badge}</div></div>`;
   }).join('');
 }
