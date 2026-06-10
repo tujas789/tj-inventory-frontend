@@ -413,7 +413,7 @@ const DEMO = (function(){
       units.forEach(u=>{ if(u.product_id===pid && u.status==='in_stock') counts[u.lot_id]=(counts[u.lot_id]||0)+1; });
       const ls=lots.filter(l=>l.product_id===pid).map(l=>({lot_id:l.lot_id, lot_no:l.lot_no, expiry_date:l.expiry_date, in_stock:counts[l.lot_id]||0}));
       ls.sort((a,b)=>(a.expiry_date||'')<(b.expiry_date||'')?-1:1);   // FEFO
-      return {ok:true, product_id:pid, lots:ls, total:ls.reduce((s,l)=>s+l.in_stock,0)};
+      return {ok:true, product_id:pid, warn_days:60, lots:ls, total:ls.reduce((s,l)=>s+l.in_stock,0)};  // [T-022] เดโม = Config default
     },
     expiringLots(p){
       const warn=(p&&p.warn_days!=null&&p.warn_days!=='')?Number(p.warn_days):60;
@@ -897,7 +897,7 @@ function toggleStockLots(pid){
     .then(res=>{
       if(!res||!res.ok){ box.innerHTML='<div class="muted">โหลดรายล็อตไม่ได้</div>'; return; }
       box.dataset.loaded='1';
-      box.innerHTML=renderLots(res.lots);
+      box.innerHTML=renderLots(res.lots, res.warn_days);
     })
     .catch(e=>{ box.innerHTML='<div class="muted">ผิดพลาด: '+esc(e.message)+'</div>'; });
 }
@@ -910,14 +910,17 @@ function stockDaysLeft(ymd){
   return Math.round((t-todayUTC)/86400000);
 }
 
-function renderLots(lots){
+function renderLots(lots, warnDays){
   if(!lots||!lots.length) return '<div class="muted" style="padding:6px 0">— ไม่มีล็อต —</div>';
+  // [T-022] เกณฑ์เตือนมาจาก backend (Config.expiry_warn_days) จุดเดียวกับหน้าหมดอายุ
+  // fallback 60 เฉพาะช่วง backend ยังเป็น version เก่าที่ไม่ส่ง warn_days
+  const warn=(warnDays!=null&&warnDays!=='')?Number(warnDays):60;
   return '<div class="lot-head">รายล็อต (หมดอายุก่อน → หลัง)</div>'+lots.map(l=>{
     const dl=stockDaysLeft(l.expiry_date);
     let tag='';
     if(dl!=null){
       if(dl<0)        tag=`<span class="badge expired">หมดอายุแล้ว ${Math.abs(dl)} วัน</span>`;
-      else if(dl<=60) tag=`<span class="badge warn">เหลือ ${dl} วัน</span>`;
+      else if(dl<=warn) tag=`<span class="badge warn">เหลือ ${dl} วัน</span>`;
       else            tag=`<span class="muted">เหลือ ${dl} วัน</span>`;
     }
     return `<div class="lot-line">
