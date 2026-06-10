@@ -92,6 +92,17 @@
   .lot-line:last-child{ border-bottom:none; }
   .lot-no{ font-weight:600; }
   .lot-right{ display:flex; align-items:center; gap:8px; white-space:nowrap; }
+  /* ─── รายชิ้นในล็อต (T-018) — drill-down ชั้นที่ 3 ─── */
+  .lot-line{ cursor:pointer; }
+  .lot-line .chev{ font-size:11px; }
+  .lot-block.open .lot-line{ border-bottom:none; }
+  .unit-detail{ margin:0 0 8px; padding:2px 0 2px 12px; border-left:2px solid var(--line); }
+  .unit-line{ display:flex; justify-content:space-between; align-items:center; gap:8px;
+              padding:4px 0; font-size:12px; }
+  .unit-line .bc{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+                  font-weight:600; letter-spacing:.5px; }
+  .unit-line.issued .bc{ color:var(--mut); text-decoration:line-through; }
+  .unit-ok{ color:var(--green); font-weight:600; }
   .hidden{ display:none !important; }   /* !important: กัน #login{display:flex} ชนะ class นี้ */
   #reader{ border-radius:12px; overflow:hidden; margin-top:12px; }
   /* ─── Login overlay ─── */
@@ -368,9 +379,14 @@ const APP_TEXT = {
     unit:              'ชิ้น',
     lotsLoading:       'กำลังโหลดรายล็อต...',
     lotsLoadFail:      'โหลดรายล็อตไม่ได้',
-    lotsHead:          'รายล็อต (หมดอายุก่อน → หลัง)',
+    lotsHead:          'รายล็อต (หมดอายุก่อน → หลัง) — กดที่ล็อตเพื่อดูรายชิ้น',
     noLots:            '— ไม่มีล็อต —',
     lotExpiryTpl:      '· หมดอายุ {exp}',
+    unitsLoading:      'กำลังโหลดรายชิ้น...',
+    unitsLoadFail:     'โหลดรายชิ้นไม่ได้',
+    noUnits:           '— ไม่มีชิ้นในล็อตนี้ —',
+    unitInStock:       '✔ ในสต๊อก',
+    unitIssuedTpl:     'เบิกแล้ว · {user} · {date}',
   },
   expiry: {
     title:      '⏰ ล็อตใกล้หมดอายุ',
@@ -508,6 +524,16 @@ const DEMO = (function(){
       const ls=lots.filter(l=>l.product_id===pid).map(l=>({lot_id:l.lot_id, lot_no:l.lot_no, expiry_date:l.expiry_date, in_stock:counts[l.lot_id]||0}));
       ls.sort((a,b)=>(a.expiry_date||'')<(b.expiry_date||'')?-1:1);   // FEFO
       return {ok:true, product_id:pid, warn_days:60, lots:ls, total:ls.reduce((s,l)=>s+l.in_stock,0)};  // [T-022] เดโม = Config default
+    },
+    getUnitsByLot(p){   // [T-018] รายชิ้นในล็อต (เดโม: ชิ้นที่เบิกแล้วใส่ user/วันที่จำลอง)
+      const lid=String(p.lot_id);
+      const us=units.filter(u=>u.lot_id===lid).map(u=>({
+        unit_barcode:u.unit_barcode, status:u.status, received_at:'',
+        issued_at:u.status==='issued'?ymd(today)+' 09:00':'',
+        issued_by:u.status==='issued'?'demo':'',
+      }));
+      us.sort((a,b)=> a.status!==b.status ? (a.status==='in_stock'?-1:1) : (a.unit_barcode<b.unit_barcode?-1:1));
+      return {ok:true, lot_id:lid, in_stock:us.filter(u=>u.status==='in_stock').length, units:us};
     },
     expiringLots(p){
       const warn=(p&&p.warn_days!=null&&p.warn_days!=='')?Number(p.warn_days):60;
@@ -1043,11 +1069,55 @@ function renderLots(lots, warnDays){
       else if(dl<=warn) tag=`<span class="badge warn">${tf(APP_TEXT.badge.warnTpl,{n:dl})}</span>`;
       else            tag=`<span class="muted">${tf(APP_TEXT.badge.leftTpl,{n:dl})}</span>`;
     }
-    return `<div class="lot-line">
-      <div><span class="lot-no">${esc(l.lot_no||l.lot_id)}</span>
-        <span class="muted">${tf(APP_TEXT.stock.lotExpiryTpl,{exp:esc(l.expiry_date||'-')})}</span></div>
-      <div class="lot-right"><b>${l.in_stock}</b> <span class="muted">${APP_TEXT.stock.unit}</span> ${tag}</div>
+    // [T-018] lot_id เข้า onclick → sanitize เหลือ [\w-] (เหตุผลเดียวกับ pid — T-020)
+    const lid=String(l.lot_id||'').replace(/[^\w-]/g,'');
+    return `<div class="lot-block">
+      <div class="lot-line" onclick="toggleLotUnits('${lid}')" role="button" tabindex="0"
+           aria-expanded="false" aria-controls="units-${lid}">
+        <div><span class="lot-no">${esc(l.lot_no||l.lot_id)}</span>
+          <span class="muted">${tf(APP_TEXT.stock.lotExpiryTpl,{exp:esc(l.expiry_date||'-')})}</span></div>
+        <div class="lot-right"><b>${l.in_stock}</b> <span class="muted">${APP_TEXT.stock.unit}</span> ${tag}
+          <span class="chev" aria-hidden="true">▾</span></div>
+      </div>
+      <div class="unit-detail hidden" id="units-${lid}"></div>
     </div>`;
+  }).join('');
+}
+
+/* ===== รายชิ้นในล็อต (T-018) — drill-down ชั้นที่ 3: ล็อต → Unit + สถานะ ===== */
+// กดที่ล็อต → ขยาย/ยุบ + โหลดรายชิ้น (lazy โหลดครั้งเดียว — pattern เดียวกับ toggleStockLots)
+function toggleLotUnits(lid){
+  const box=$('units-'+lid);
+  if(!box) return;
+  const block=box.closest('.lot-block');
+  const line=block.querySelector('.lot-line');
+  if(!box.classList.contains('hidden')){
+    box.classList.add('hidden'); block.classList.remove('open');
+    line.setAttribute('aria-expanded','false');
+    return;
+  }
+  box.classList.remove('hidden'); block.classList.add('open');
+  line.setAttribute('aria-expanded','true');
+  if(box.dataset.loaded){ return; }
+  box.innerHTML=`<div class="muted" style="padding:4px 0">${APP_TEXT.stock.unitsLoading}</div>`;
+  apiGet('getUnitsByLot',{lot_id:lid})
+    .then(res=>{
+      if(!res||!res.ok){ box.innerHTML=`<div class="muted">${APP_TEXT.stock.unitsLoadFail}</div>`; return; }
+      box.dataset.loaded='1';
+      box.innerHTML=renderUnits(res.units);
+    })
+    .catch(e=>{ box.innerHTML=`<div class="muted">${tf(APP_TEXT.common.errorTpl,{msg:esc(e.message)})}</div>`; });
+}
+
+function renderUnits(units){
+  if(!units||!units.length) return `<div class="muted" style="padding:4px 0">${APP_TEXT.stock.noUnits}</div>`;
+  return units.map(u=>{
+    const inStock=u.status==='in_stock';
+    const right=inStock
+      ? `<span class="unit-ok">${APP_TEXT.stock.unitInStock}</span>`
+      : `<span class="muted">${tf(APP_TEXT.stock.unitIssuedTpl,
+          {user:esc(u.issued_by||'-'), date:esc((u.issued_at||'').substring(0,10)||'-')})}</span>`;
+    return `<div class="unit-line ${inStock?'':'issued'}"><span class="bc">${esc(u.unit_barcode)}</span>${right}</div>`;
   }).join('');
 }
 
