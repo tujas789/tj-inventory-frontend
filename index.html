@@ -33,6 +33,9 @@
             font-weight:600; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; transition:.15s; }
   .tab-btn.active{ color:var(--gold); border-bottom-color:var(--gold); }
   .tab-btn:active{ background:var(--card2); }
+  /* [T-025] focus-visible — กรอบชัดเมื่อใช้คีย์บอร์ด แต่ไม่รบกวนตอนกดมือถือ */
+  :focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+  .tab-btn:focus-visible{ outline-offset:-2px; }
   /* ─── Layout ─── */
   .wrap{ max-width:560px; margin:0 auto; padding:16px; }
   .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
@@ -149,16 +152,16 @@
     </div>
   </header>
 
-  <!-- Tab bar -->
-  <div class="tabbar">
-    <button id="tab-btn-issue"   class="tab-btn active" onclick="showTab('issue')"   data-text="tabs.issue">📤 เบิก</button>
-    <button id="tab-btn-receive" class="tab-btn"        onclick="showTab('receive')" data-text="tabs.receive">📥 รับเข้า</button>
-    <button id="tab-btn-stock"   class="tab-btn"        onclick="showTab('stock')"   data-text="tabs.stock">📊 สต๊อก</button>
-    <button id="tab-btn-expiry"  class="tab-btn"        onclick="showTab('expiry')"  data-text="tabs.expiry">⏰ หมดอายุ</button>
+  <!-- Tab bar [T-025] role=tablist + aria-selected -->
+  <div class="tabbar" role="tablist" aria-label="เมนูหลัก">
+    <button id="tab-btn-issue"   class="tab-btn active" role="tab" aria-selected="true"  aria-controls="tab-issue"   onclick="showTab('issue')"   data-text="tabs.issue">📤 เบิก</button>
+    <button id="tab-btn-receive" class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-receive" onclick="showTab('receive')" data-text="tabs.receive">📥 รับเข้า</button>
+    <button id="tab-btn-stock"   class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-stock"   onclick="showTab('stock')"   data-text="tabs.stock">📊 สต๊อก</button>
+    <button id="tab-btn-expiry"  class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-expiry"  onclick="showTab('expiry')"  data-text="tabs.expiry">⏰ หมดอายุ</button>
   </div>
 
   <!-- ===== Tab: เบิกจ่าย ===== -->
-  <section id="tab-issue" class="wrap">
+  <section id="tab-issue" class="wrap" role="tabpanel" aria-labelledby="tab-btn-issue">
     <div class="card scanbox">
       <h2 data-text="issue.title">📤 เบิกจ่าย — ยิง barcode ตัดสต๊อกทันที</h2>
       <input id="issueInput" autocomplete="off"
@@ -176,7 +179,7 @@
   </section>
 
   <!-- ===== Tab: รับเข้า ===== -->
-  <section id="tab-receive" class="wrap hidden">
+  <section id="tab-receive" class="wrap hidden" role="tabpanel" aria-labelledby="tab-btn-receive">
 
     <!-- Card 1: เลือกชนิด -->
     <div class="card">
@@ -227,7 +230,7 @@
   </section>
 
   <!-- ===== Tab: เช็คสต๊อก (T-016) ===== -->
-  <section id="tab-stock" class="wrap hidden">
+  <section id="tab-stock" class="wrap hidden" role="tabpanel" aria-labelledby="tab-btn-stock">
     <div class="card">
       <!-- title หุ้ม span เพราะ data-text เซ็ต textContent — ใส่บน h2 ตรงๆ จะลบปุ่มรีเฟรชข้างใน -->
       <h2><span data-text="stock.title">📊 สต๊อกคงเหลือ</span> <button class="ghost sm" style="margin-left:auto" onclick="initStockTab()" data-text="stock.refreshBtn">🔄 รีเฟรช</button></h2>
@@ -238,7 +241,7 @@
   </section>
 
   <!-- ===== Tab: ใกล้หมดอายุ (FEFO — T-009) ===== -->
-  <section id="tab-expiry" class="wrap hidden">
+  <section id="tab-expiry" class="wrap hidden" role="tabpanel" aria-labelledby="tab-btn-expiry">
     <div class="card">
       <h2><span data-text="expiry.title">⏰ ล็อตใกล้หมดอายุ</span> <button class="ghost sm" style="margin-left:auto" onclick="initExpiryTab()" data-text="expiry.refreshBtn">🔄 รีเฟรช</button></h2>
       <div id="expirySummary" class="muted" style="margin-bottom:10px" data-text="common.loading">กำลังโหลด...</div>
@@ -594,7 +597,9 @@ let stockTabInited=false;
 function showTab(name){
   ['issue','receive','stock','expiry'].forEach(n=>{
     $('tab-'+n).classList.toggle('hidden', n!==name);
-    $('tab-btn-'+n).classList.toggle('active', n===name);
+    const btn=$('tab-btn-'+n);
+    btn.classList.toggle('active', n===name);
+    btn.setAttribute('aria-selected', n===name ? 'true' : 'false');  // [T-025]
   });
   if(name==='issue'){ stopCam(); $('issueInput').focus(); }
   if(name==='receive' && !receiveTabInited){ receiveTabInited=true; initReceiveTab(); }
@@ -904,11 +909,18 @@ function printLabels(){
   }
   const fdoc=frame.contentWindow.document;
   fdoc.open(); fdoc.write(doc); fdoc.close();
-  // รอ layout/วาด SVG + โหลดฟอนต์ แล้วสั่งพิมพ์จาก iframe โดยตรง
-  setTimeout(function(){
-    try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
-    catch(e){ toast(tf(APP_TEXT.print.failTpl,{msg:e.message}),false); }
-  },300);
+  // [T-025] รอฟอนต์โหลดเสร็จจริงก่อนสั่งพิมพ์ (แทน setTimeout มั่วๆ ที่อาจสั้นไปบนเน็ตช้า)
+  const fDoc = frame.contentWindow.document;
+  (fDoc.fonts && fDoc.fonts.ready ? fDoc.fonts.ready : Promise.resolve())
+    .then(function(){
+      try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
+      catch(e){ toast(tf(APP_TEXT.print.failTpl,{msg:e.message}),false); }
+    })
+    .catch(function(){
+      // fallback กรณี fonts.ready reject (เช่น iOS Safari เก่า)
+      try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
+      catch(e){ toast(tf(APP_TEXT.print.failTpl,{msg:e.message}),false); }
+    });
 }
 
 /* ===== พรีวิวฉลากบนจอ (dev) — เปิด index.html?labelpreview=00000027,00000028 =====
@@ -960,9 +972,9 @@ function renderStock(res){
     // [T-020] pid เข้า onclick (string ใน JS) → sanitize เหลือ [\w-] (HTML-escape อย่างเดียวไม่พอ เพราะ browser ถอด entity ก่อน parse JS)
     const pid=String(r.product_id||'').replace(/[^\w-]/g,'');
     return `<div class="item stock-row ${r.in_stock<=0?'zero':''}" data-name="${esc(nm.toLowerCase())}">
-      <div class="top" onclick="toggleStockLots('${pid}')">
+      <div class="top" onclick="toggleStockLots('${pid}')" role="button" tabindex="0" aria-expanded="false" aria-controls="lots-${pid}">
         <div><div class="name">${esc(nm)}</div><div class="meta">${esc(r.product_id)}</div></div>
-        <div class="stock-qty"><b>${r.in_stock}</b> <span class="muted">${APP_TEXT.stock.unit}</span> <span class="chev">▾</span></div>
+        <div class="stock-qty"><b>${r.in_stock}</b> <span class="muted">${APP_TEXT.stock.unit}</span> <span class="chev" aria-hidden="true">▾</span></div>
       </div>
       <div class="lot-detail hidden" id="lots-${pid}"></div>
     </div>`;
@@ -973,8 +985,14 @@ function renderStock(res){
 function toggleStockLots(pid){
   const box=$('lots-'+pid);
   const row=box.closest('.stock-row');
-  if(!box.classList.contains('hidden')){ box.classList.add('hidden'); row.classList.remove('open'); return; }
+  const toggle=row.querySelector('.top');  // [T-025]
+  if(!box.classList.contains('hidden')){
+    box.classList.add('hidden'); row.classList.remove('open');
+    if(toggle) toggle.setAttribute('aria-expanded','false');  // [T-025]
+    return;
+  }
   row.classList.add('open'); box.classList.remove('hidden');
+  if(toggle) toggle.setAttribute('aria-expanded','true');  // [T-025]
   if(box.dataset.loaded){ return; }
   box.innerHTML=`<div class="muted" style="padding:6px 0">${APP_TEXT.stock.lotsLoading}</div>`;
   apiGet('stockByLot',{product_id:pid})
