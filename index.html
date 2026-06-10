@@ -276,6 +276,7 @@ const APP_TEXT = {
     enterPin:        'ใส่ PIN ก่อน',
     failed:          'เข้าไม่ได้',
     loadUsersFailTpl:'โหลดรายชื่อไม่ได้: {msg}',
+    sessionExpired:  'เซสชันหมดอายุ — กรุณา login ใหม่',   // [T-014]
   },
   header: { logout: 'ออก' },
   issue: {
@@ -419,7 +420,10 @@ function apiGet(action, params){
 }
 function apiPost(payload){
   if(IS_DEMO) return DEMO.call(payload.action, payload);
-  return fetch(API_URL, {method:'POST', body:JSON.stringify(payload)}).then(r=>r.json());
+  // [T-014] แนบ session token อัตโนมัติ + token ตาย (auth:false) → เด้งกลับหน้า login จุดเดียว
+  if(CURRENT && CURRENT.token && !payload.token) payload.token = CURRENT.token;
+  return fetch(API_URL, {method:'POST', body:JSON.stringify(payload)}).then(r=>r.json())
+    .then(res=>{ if(res && res.auth===false) forceRelogin(); return res; });
 }
 
 /* ===== DEMO dispatcher (ทำงานเมื่อ IS_DEMO) — ข้อมูลตัวอย่างปลอมใน memory =====
@@ -458,9 +462,12 @@ const DEMO = (function(){
     getUsers(){ return {ok:true, users:users.map(u=>({...u}))}; },
     verifyPin(p){
       const u=users.find(x=>x.user_id===(p&&p.user_id));   // เดโม: PIN อะไรก็ได้
-      return u ? {ok:true, user_id:u.user_id, display_name:u.display_name, role:u.role}
+      return u ? {ok:true, user_id:u.user_id, display_name:u.display_name, role:u.role,
+                  token:'DEMO-TOKEN', expires:Date.now()+86400000}   // [T-014] ให้ flow เหมือนจริง
                : {ok:false, error:'ไม่พบผู้ใช้ (เดโม)'};
     },
+    checkToken(){ return {ok:true}; },   // [T-014]
+    logout(){ return {ok:true}; },       // [T-014]
     getProducts(){ return {ok:true, products:products.map(p=>({...p}))}; },
     lookupByVendorBarcode(p){
       const found=products.filter(x=>x.vendor_barcode===String(p.vendor_barcode).trim());
@@ -540,9 +547,18 @@ const DEMO = (function(){
 })();
 
 /* ===== Session ===== */
-function saveSession(o){ try{ sessionStorage.setItem('tj_user', JSON.stringify(o)); }catch(e){} }
-function clearSession(){ try{ sessionStorage.removeItem('tj_user'); }catch(e){} }
-function loadSession(){ try{ const r=sessionStorage.getItem('tj_user'); return r?JSON.parse(r):null; }catch(e){ return null; } }
+// [T-014] token อายุ 30 วัน → ใช้ localStorage (รอดข้ามการปิดเบราว์เซอร์ ไม่ต้อง login ทุกวัน)
+function saveSession(o){ try{ localStorage.setItem('tj_user', JSON.stringify(o)); }catch(e){} }
+function clearSession(){ try{ localStorage.removeItem('tj_user'); sessionStorage.removeItem('tj_user'); }catch(e){} }
+function loadSession(){ try{ const r=localStorage.getItem('tj_user'); return r?JSON.parse(r):null; }catch(e){ return null; } }
+// [T-014] token หมดอายุ/ถูกลบฝั่ง server → เคลียร์ session กลับหน้า login (เรียกจาก apiPost จุดเดียว)
+function forceRelogin(){
+  if(!CURRENT) return;
+  stopCam(); CURRENT=null; clearSession();
+  $('app').classList.add('hidden'); $('login').classList.remove('hidden');
+  $('pinInput').value='';
+  toast(APP_TEXT.login.sessionExpired, false);
+}
 
 /* ===== Toast ===== */
 function toast(msg, ok=true){
@@ -580,6 +596,8 @@ function doLogin(){
     .catch(e=>{ $('loginBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
 }
 function doLogout(){
+  // [T-014] แจ้ง server ลบ token (best-effort — เน็ตล่มก็ออกจากหน้าจอได้)
+  if(CURRENT && CURRENT.token){ try{ apiPost({action:'logout'}).catch(()=>{}); }catch(e){} }
   stopCam(); CURRENT=null; clearSession();
   $('app').classList.add('hidden'); $('login').classList.remove('hidden');
   $('pinInput').value=''; $('pinInput').focus();
@@ -1089,7 +1107,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   if(initLabelPreview()) return;   // โหมดพรีวิวฉลาก (?labelpreview=...) — ข้าม login/loadUsers
   const saved=loadSession();
-  if(saved){ CURRENT=saved; enterApp(); }
+  // [T-014] session ต้องมี token (ของเก่าก่อน T-014 ไม่มี → ให้ login ใหม่ครั้งเดียว)
+  // เข้าแอปทันทีแบบ optimistic แล้วเช็ค token เงียบๆ เบื้องหลัง — ไม่ถ่วงการยิงสต๊อก
+  // ถ้าตายจริง apiPost จะ forceRelogin เอง
+  if(saved && saved.token){
+    CURRENT=saved; enterApp();
+    apiPost({action:'checkToken'}).catch(()=>{});
+  } else if(saved){ clearSession(); }
   loadUsers();
 });
 </script>
