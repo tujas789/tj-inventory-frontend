@@ -6,11 +6,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>TJ Inventory</title>
 <!-- สแกน barcode ด้วยกล้องมือถือ (Q4: รองรับทั้ง Chrome/Android + Safari/iOS) -->
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
 <!-- generate Code128 barcode สำหรับพิมพ์ฉลาก (T-008) -->
-<script src="https://unpkg.com/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://unpkg.com/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" integrity="sha384-Kk5SjBOKprEnGfyBWfD2zROFd1Cu8kwOXxG2GIhYPcoDL2rBJS9P8Ud1ZMy4412a" crossorigin="anonymous"></script>
 <!-- generate QR code สำหรับกล้องมือถือ iOS+Android (T-015) — เล็ก, sync, ออก SVG คมเหมาะ thermal -->
-<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k" crossorigin="anonymous"></script>
 <!-- ฟอนต์ธีม Binance: IBM Plex Sans (+ Thai subset ให้ภาษาไทยคมเหมือนกัน) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1060,6 +1060,15 @@ $('recvVbcInput').addEventListener('keydown', e=>{ if(e.key==='Enter') scanVendo
 
 document.addEventListener('DOMContentLoaded', ()=>{
   applyAppText();
+
+  // [T-024] เช็กตอนเปิดแอปว่า lib ภายนอกจาก CDN โหลดครบหรือไม่
+  if(typeof Html5Qrcode==='undefined' || typeof JsBarcode==='undefined' || typeof qrcode==='undefined'){
+    const banner=document.createElement('div');
+    banner.textContent='⚠️ เน็ตมีปัญหา ฟีเจอร์กล้อง/พิมพ์ใช้ไม่ได้ (Library โหลดไม่ครบ)';
+    banner.style.cssText='background:var(--dan);color:#fff;padding:10px;text-align:center;font-size:13px;font-weight:bold;z-index:9999;position:relative;';
+    document.body.prepend(banner);
+  }
+
   if(initLabelPreview()) return;   // โหมดพรีวิวฉลาก (?labelpreview=...) — ข้าม login/loadUsers
   const saved=loadSession();
   if(saved){ CURRENT=saved; enterApp(); }
