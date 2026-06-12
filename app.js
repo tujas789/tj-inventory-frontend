@@ -244,10 +244,12 @@ function doReceive(){
       $('recvBtn').disabled=false;
       if(!res||!res.ok){ toast(res.error||APP_TEXT.receive.failed,false); return; }
       toast(tf(APP_TEXT.receive.okTpl,{n:res.unit_barcodes.length}));
-      // เก็บข้อมูลฉลากฝั่ง client (ชื่อ/วันหมดอายุ/unit_barcode) — ครบไม่ต้องถาม server ซ้ำ
+      // เก็บข้อมูลฉลากฝั่ง client (ชื่อ/วันหมดอายุ/วันที่รับ/unit_barcode) — ครบไม่ต้องถาม server ซ้ำ
+      // received: ใช้ stamp จาก server (T-031) — fallback วันที่เครื่องถ้า backend ยังเป็น version เก่า
       lastReceive={
         product_name: res.product_name||res.product_id,
         expiry:       payload.expiry_date,
+        received:     String(res.received_at||todayLocalIso()).slice(0,10),
         lot_no:       payload.lot_no,
         lot_id:       res.lot_id,
         unit_barcodes:res.unit_barcodes,
@@ -289,6 +291,11 @@ function fmtExpiry(d){
   if(p.length!==3) return d||'';
   return p[2]+'/'+p[1]+'/'+p[0].slice(2);
 }
+/** วันที่วันนี้ตามเครื่อง 'YYYY-MM-DD' — fallback ของ received_at (T-031) */
+function todayLocalIso(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 /* ===== เทมเพลตฉลาก (T-008 / T-015) — เลย์เอาต์ใหม่ ใช้ร่วมทั้งพิมพ์จริง + พรีวิว =====
    layout: แถวบน = [ QR ใหญ่ ~15mm (พระเอก) | ชื่อสินค้า 2 บรรทัด + กล่อง EXP ]
            แถวล่าง = Code128 เต็มความกว้าง (แท่งอ้วน) + เลข human-readable ใต้แท่ง
@@ -302,25 +309,31 @@ const LABEL_CSS=[
   '*{margin:0;padding:0;box-sizing:border-box;}',
   'html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
   // [T-015] label 24mm < หน้า 25mm = เผื่อ slack 1mm กัน rounding ดันหน้าว่าง (บทเรียน JOURNAL bug #2)
-  '.label{width:50mm;height:24mm;padding:0.7mm 1.5mm;display:flex;flex-direction:column;',
+  // [T-031] padding ข้าง 1.5→1.2mm + head gap 1.6→1.3mm — คืนพื้นที่แนวนอนให้แถววันที่ (EXP+รับ) พอดี
+  '.label{width:50mm;height:24mm;padding:0.7mm 1.2mm;display:flex;flex-direction:column;',
     'overflow:hidden;color:#000;background:#fff;',
     'font-family:"IBM Plex Sans Thai","IBM Plex Sans","Segoe UI",Tahoma,sans-serif;}',
   '.label+.label{page-break-before:always;}',
-  '.lb-head{display:flex;gap:1.6mm;flex:1;min-height:0;align-items:center;}',
+  '.lb-head{display:flex;gap:1.3mm;flex:1;min-height:0;align-items:center;}',
   '.lb-qr{flex:0 0 14mm;width:14mm;height:14mm;}',
   '.lb-qr svg{width:100%;height:100%;display:block;}',
   '.lb-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1mm;}',
   '.lb-name{font-size:8pt;font-weight:700;line-height:1.12;display:-webkit-box;',
     '-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}',
-  '.lb-exp{align-self:flex-start;font-size:7.5pt;font-weight:700;line-height:1;white-space:nowrap;',
-    'border:0.3mm solid #000;border-radius:1mm;padding:0.5mm 1.4mm;}',
+  // [T-031] แถววันที่: กล่อง EXP (เด่น มีกรอบ) + วันที่รับ (ตัวเล็ก ไม่มีกรอบ) อยู่บรรทัดเดียวกัน
+  // ⚠️ พื้นที่ 50mm ตึงมาก — ขนาด/gap ด้านล่างวัดแล้วเหลือ slack ~1mm พอดี อย่าขยายโดยไม่วัดใหม่
+  //    (วัดผ่าน ?labelpreview + getBoundingClientRect — ข้อความวันที่ยาวคงที่ DD/MM/YY เสมอ)
+  '.lb-dates{display:flex;align-items:center;gap:0.8mm;}',
+  '.lb-exp{font-size:7pt;font-weight:700;line-height:1;white-space:nowrap;',
+    'border:0.3mm solid #000;border-radius:1mm;padding:0.5mm 0.9mm;}',
+  '.lb-recv{font-size:6pt;font-weight:400;line-height:1;white-space:nowrap;}',
   '.lb-bc{width:100%;height:5mm;}',
   '.lb-bc svg{width:100%;height:100%;display:block;}',
   '.lb-code{font-family:"IBM Plex Mono","Courier New",monospace;font-size:7.5pt;font-weight:700;',
     'text-align:center;letter-spacing:2px;white-space:nowrap;line-height:1;margin-top:0.6mm;}'
 ].join('');
 
-// สร้าง .label หนึ่งใบ — item = {name, exp (ข้อความเต็มเช่น "EXP 04/06/69" หรือ ''), code}
+// สร้าง .label หนึ่งใบ — item = {name, exp (ข้อความเต็มเช่น "EXP 04/06/69" หรือ ''), recv ("รับ 12/06/69" หรือ ''), code}
 function buildLabelItem(item){
   // [T-020] ใช้ esc() กลาง (top-level) แทน local
   // Code128 — เต็มความกว้าง แท่งอ้วน ; margin 20 (=10 โมดูล) = quiet zone ครบสเปก
@@ -345,7 +358,11 @@ function buildLabelItem(item){
         '<div class="lb-qr">'+qrHtml+'</div>'+
         '<div class="lb-info">'+
           '<div class="lb-name">'+esc(item.name)+'</div>'+
-          (item.exp?'<div class="lb-exp">'+esc(item.exp)+'</div>':'')+
+          ((item.exp||item.recv)?
+            '<div class="lb-dates">'+
+              (item.exp?'<div class="lb-exp">'+esc(item.exp)+'</div>':'')+
+              (item.recv?'<div class="lb-recv">'+esc(item.recv)+'</div>':'')+
+            '</div>':'')+
         '</div>'+
       '</div>'+
       '<div class="lb-bc">'+bcHtml+'</div>'+
@@ -367,8 +384,10 @@ function printLabels(){
   // ── พิมพ์ผ่าน hidden iframe แล้วสั่ง frame.contentWindow.print() ────────────
   // สั่ง print() บน iframe ที่เราคุมเอง → @page ของ iframe ถูกใช้จริง (ไม่หมุน 90°)
   const expTxt = lastReceive.expiry ? ('EXP '+fmtExpiry(lastReceive.expiry)) : '';
+  // 'รับ' ไม่เว้นวรรค — จงใจ ประหยัดความกว้าง (slack แถววันที่เหลือ ~1mm)
+  const recvTxt = lastReceive.received ? ('รับ'+fmtExpiry(lastReceive.received)) : '';
   const items = lastReceive.unit_barcodes.map(code=>({
-    name: lastReceive.product_name||'', exp: expTxt, code: code
+    name: lastReceive.product_name||'', exp: expTxt, recv: recvTxt, code: code
   }));
   const doc = buildLabelDoc(items);
   let frame=document.getElementById('labelPrintFrame');
@@ -404,7 +423,8 @@ function initLabelPreview(){
   const codes=(raw&&raw.trim())?raw.split(',').map(s=>s.trim()).filter(Boolean):['00000027'];
   const name=q.get('name')||'On call Advance Cleaner Premium';
   const expRaw=q.get('exp')||'2026-06-04';
-  const items=codes.map(c=>({name, exp:'EXP '+fmtExpiry(expRaw), code:c}));
+  const recvRaw=q.get('recv')||todayLocalIso();   // [T-031] override ได้ด้วย ?recv=YYYY-MM-DD
+  const items=codes.map(c=>({name, exp:'EXP '+fmtExpiry(expRaw), recv:'รับ'+fmtExpiry(recvRaw), code:c}));
   $('login').classList.add('hidden'); $('app').classList.add('hidden');
   const st=document.createElement('style');
   st.textContent=LABEL_CSS+
