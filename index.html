@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260612b">
+<link rel="stylesheet" href="style.css?v=20260612c">
 </head>
 <body>
 
@@ -49,7 +49,6 @@
   <div class="tabbar" role="tablist" aria-label="เมนูหลัก">
     <button id="tab-btn-issue"   class="tab-btn active" role="tab" aria-selected="true"  aria-controls="tab-issue"   onclick="showTab('issue')"   data-text="tabs.issue">📤 เบิก</button>
     <button id="tab-btn-receive" class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-receive" onclick="showTab('receive')" data-text="tabs.receive">📥 รับเข้า</button>
-    <button id="tab-btn-print"   class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-print"   onclick="showTab('print')"   data-text="tabs.print">🖨️ รอปริ้น</button>
     <button id="tab-btn-stock"   class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-stock"   onclick="showTab('stock')"   data-text="tabs.stock">📊 สต๊อก</button>
     <button id="tab-btn-expiry"  class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-expiry"  onclick="showTab('expiry')"  data-text="tabs.expiry">⏰ หมดอายุ</button>
   </div>
@@ -110,6 +109,9 @@
       <input id="recvExpiry" type="date">
       <label data-text="receive.qtyLabel">จำนวนที่รับเข้า *</label>
       <input id="recvQty" type="number" min="1" value="1" inputmode="numeric">
+      <!-- [T-033] ตัวอย่างฉลากสด — render จากเทมเพลตเดียวกับพิมพ์จริง (labels.js) -->
+      <label data-text="receive.sampleLabel">ตัวอย่างฉลาก (อัปเดตตามที่กรอก)</label>
+      <div id="labelSample"></div>
       <button id="recvBtn" class="green" onclick="doReceive()" data-text="receive.submitBtn">📥 รับเข้า</button>
     </div>
 
@@ -118,20 +120,14 @@
       <h2 data-text="receive.resultTitle">✅ รับเข้าสำเร็จ</h2>
       <div id="recvResultBody"></div>
       <button class="green" id="printBtn" onclick="printLabels()" data-text="receive.printBtn">🖨️ พิมพ์ฉลาก</button>
-      <!-- [T-032] ปิดงานปริ้นจากตรงนี้ได้เลย (กรณีรับ+ปริ้นเครื่องเดียวกัน ไม่ต้องไปแท็บรอปริ้น) -->
-      <button class="ghost" id="markPrintedBtn" onclick="markReceivePrinted()" style="margin-top:8px" data-text="receive.markPrintedBtn">✓ ปริ้นแล้ว — ปิดงานปริ้น</button>
       <button class="ghost" onclick="resetReceive()" style="margin-top:8px" data-text="receive.nextBtn">🔄 รับเข้าชุดถัดไป</button>
     </div>
 
-  </section>
-
-  <!-- ===== Tab: รอปริ้น (T-032) ===== -->
-  <section id="tab-print" class="wrap hidden" role="tabpanel" aria-labelledby="tab-btn-print">
-    <div class="card">
-      <h2><span data-text="printq.title">🖨️ งานปริ้นสติกเกอร์</span> <button class="ghost sm" style="margin-left:auto" onclick="initPrintTab()" data-text="printq.refreshBtn">🔄 รีเฟรช</button></h2>
-      <div id="printSummary" class="muted" style="margin-bottom:10px" data-text="common.loading">กำลังโหลด...</div>
-      <div id="printList"></div>
+    <!-- [T-033] ทางเข้าหน้าประวัติการปริ้น (html แยก — ปริ้นซ้ำได้ ไม่ต้อง login) -->
+    <div style="text-align:center;margin-top:4px">
+      <a href="print-history.html" target="_blank" class="muted" style="font-size:13px" data-text="receive.historyLink">🕘 ประวัติการปริ้น ↗</a>
     </div>
+
   </section>
 
   <!-- ===== Tab: เช็คสต๊อก (T-016) ===== -->
@@ -161,8 +157,9 @@
 <div id="printArea"></div>
 
 <!-- T-030: JS แตกเป็นไฟล์ — ลำดับสำคัญ (app-text -> api -> app) และต้องอยู่ท้าย body (มี addEventListener นอก DOMContentLoaded) -->
-<script src="app-text.js?v=20260612b"></script>
-<script src="api.js?v=20260612b"></script>
-<script src="app.js?v=20260612b"></script>
+<script src="app-text.js?v=20260612c"></script>
+<script src="api.js?v=20260612c"></script>
+<script src="labels.js?v=20260612c"></script>
+<script src="app.js?v=20260612c"></script>
 </body>
 </html>

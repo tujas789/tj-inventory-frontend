@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>TJ Inventory — ประวัติการปริ้น</title>
+<!-- [T-033] หน้าประวัติการปริ้น + ปริ้นซ้ำ — อ่านอย่างเดียว ไม่ต้อง login (แบบ dashboard, ADR-0004) -->
+<!-- generate Code128 + QR สำหรับปริ้นซ้ำ (SRI เดียวกับ index.html — T-024) -->
+<script src="https://unpkg.com/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" integrity="sha384-Kk5SjBOKprEnGfyBWfD2zROFd1Cu8kwOXxG2GIhYPcoDL2rBJS9P8Ud1ZMy4412a" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k" crossorigin="anonymous"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20260612c">
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <h1 data-text="printq.title">🕘 ประวัติการปริ้น</h1>
+    <div class="who">
+      <a href="index.html" class="muted" style="font-size:13px" data-text="printq.backLink">← กลับหน้าแอป</a>
+    </div>
+  </header>
+
+  <section class="wrap">
+    <div class="card">
+      <h2><span data-text="printq.title">🕘 ประวัติการปริ้น</span> <button class="ghost sm" style="margin-left:auto" onclick="initHistory()" data-text="printq.refreshBtn">🔄 รีเฟรช</button></h2>
+      <div id="histSummary" class="muted" style="margin-bottom:10px" data-text="common.loading">กำลังโหลด...</div>
+      <div id="histList"></div>
+    </div>
+  </section>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<!-- ลำดับ script สำคัญ: app-text → api → labels → ส่วนของหน้านี้ -->
+<script src="app-text.js?v=20260612c"></script>
+<script src="api.js?v=20260612c"></script>
+<script src="labels.js?v=20260612c"></script>
+<script>
+/* toast ฉบับย่อ (หน้านี้ไม่โหลด app.js — printLabelItems ใน labels.js เรียกใช้) */
+function toast(msg, ok=true){
+  const el=$('toast'); el.textContent=msg;
+  el.className='toast show '+(ok?'ok':'err');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.className='toast', 2500);
+}
+
+let histCache={};   // job_id → job (ไว้ประกอบฉลากตอนกดพิมพ์ซ้ำ ไม่ยิง server ซ้ำ)
+
+function initHistory(){
+  $('histSummary').textContent=APP_TEXT.common.loading;
+  apiGet('listPrintJobs')
+    .then(res=>{
+      if(!res||!res.ok){ $('histSummary').textContent=(res&&res.error)||APP_TEXT.printq.loadFail; return; }
+      renderHistory(res);
+    })
+    .catch(e=>{ $('histSummary').textContent=tf(APP_TEXT.common.errorTpl,{msg:e.message}); });
+}
+
+function renderHistory(res){
+  const jobs=res.jobs||[];
+  histCache={}; jobs.forEach(j=>{ histCache[j.job_id]=j; });
+  if(!jobs.length){
+    $('histSummary').textContent='';
+    $('histList').innerHTML=`<div class="empty">${APP_TEXT.printq.empty}</div>`;
+    return;
+  }
+  $('histSummary').innerHTML=tf(APP_TEXT.printq.summaryTpl,{n:res.total||jobs.length, shown:jobs.length});
+  $('histList').innerHTML=jobs.map(j=>{
+    // [T-020 pattern] job_id เข้า onclick → sanitize เหลือ [\w-]
+    const jid=String(j.job_id||'').replace(/[^\w-]/g,'');
+    const recv=fmtExpiry(String(j.received_at||'').slice(0,10));
+    const meta=tf(APP_TEXT.printq.metaTpl,{recv:esc(recv), lot:esc(j.lot_no||j.lot_id), n:j.qty, user:esc(j.created_by||'-')});
+    return `<div class="item"><div class="top">
+      <div><div class="name">${esc(j.product_name)}</div><div class="meta">${esc(j.job_id)} · ${meta}</div></div>
+      <button class="ghost sm" onclick="doReprint('${jid}')">${APP_TEXT.printq.reprintBtn}</button>
+    </div></div>`;
+  }).join('');
+}
+
+function doReprint(jid){
+  const j=histCache[jid];
+  if(!j){ toast(APP_TEXT.print.noLabels,false); return; }
+  printLabelItems(buildLabelItems({
+    product_name: j.product_name,
+    expiry:       j.expiry_date,
+    received:     String(j.received_at||'').slice(0,10),
+    unit_barcodes:j.unit_barcodes,
+  }));
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  applyAppText();
+  initHistory();
+});
+</script>
+</body>
+</html>

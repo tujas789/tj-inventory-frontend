@@ -67,16 +67,17 @@ let receiveTabInited=false;
 let expiryTabInited=false;
 let stockTabInited=false;
 function showTab(name){
-  ['issue','receive','print','stock','expiry'].forEach(n=>{
+  ['issue','receive','stock','expiry'].forEach(n=>{
     $('tab-'+n).classList.toggle('hidden', n!==name);
     const btn=$('tab-btn-'+n);
     btn.classList.toggle('active', n===name);
     btn.setAttribute('aria-selected', n===name ? 'true' : 'false');  // [T-025]
   });
   if(name==='issue'){ stopCam(); $('issueInput').focus(); }
-  if(name==='receive' && !receiveTabInited){ receiveTabInited=true; initReceiveTab(); }
-  // [T-032] รอปริ้นโหลดใหม่ทุกครั้งที่เปิด (ไม่ cache) — งานมาจากเครื่องอื่นได้ ลิสต์ค้างคือผิดวัตถุประสงค์
-  if(name==='print'){ initPrintTab(); }
+  if(name==='receive'){
+    if(!receiveTabInited){ receiveTabInited=true; initReceiveTab(); }
+    renderLabelSample();   // [T-033] ตัวอย่างฉลากสด
+  }
   if(name==='stock' && !stockTabInited){ stockTabInited=true; initStockTab(); }
   if(name==='expiry' && !expiryTabInited){ expiryTabInited=true; initExpiryTab(); }
 }
@@ -199,6 +200,7 @@ function selectProduct(prod){
     sel.appendChild(opt); sel.value=prod.product_id;
   }
   hideNewProductForm();
+  renderLabelSample();   // [T-033]
 }
 
 function showNewProductForm(vbc){
@@ -218,6 +220,7 @@ function toggleNewProduct(){
   } else {
     hideNewProductForm();
   }
+  renderLabelSample();   // [T-033] ชื่อบนตัวอย่างเปลี่ยนแหล่ง (dropdown ↔ ช่องชื่อใหม่)
 }
 
 function doReceive(){
@@ -255,7 +258,6 @@ function doReceive(){
         lot_no:       payload.lot_no,
         lot_id:       res.lot_id,
         unit_barcodes:res.unit_barcodes,
-        print_job_id: res.print_job_id||'',   // [T-032] ไว้ปิดงานจากการ์ดผลรับเข้าได้เลย
       };
       renderReceiveResult(res);
     })
@@ -273,24 +275,7 @@ function renderReceiveResult(res){
        <div class="monospace">${res.unit_barcodes.map(esc).join('<br>')}</div>
      </div>`;
   $('printBtn').textContent=tf(APP_TEXT.receive.printBtnTpl,{n:res.unit_barcodes.length});
-  // [T-032] ปุ่มปิดงานปริ้น — โชว์เฉพาะเมื่อ server สร้าง PrintJob สำเร็จ (backend เก่า/สร้างพลาด = ซ่อน)
-  const mk=$('markPrintedBtn');
-  mk.classList.toggle('hidden', !(res.print_job_id));
-  mk.disabled=false; mk.textContent=APP_TEXT.receive.markPrintedBtn;
   $('recvResult').classList.remove('hidden');
-}
-
-// [T-032] ปิดงานปริ้นจากการ์ดผลรับเข้า (รับ+ปริ้นเครื่องเดียวกัน — ไม่ต้องไปแท็บรอปริ้น)
-function markReceivePrinted(){
-  if(!lastReceive||!lastReceive.print_job_id) return;
-  const btn=$('markPrintedBtn'); btn.disabled=true;
-  apiPost({action:'markPrintJobPrinted', job_id:lastReceive.print_job_id, user:CURRENT.user_id})
-    .then(res=>{
-      if(!res||!res.ok){ btn.disabled=false; toast(tf(APP_TEXT.printq.markFailTpl,{msg:(res&&res.error)||''}),false); return; }
-      toast(APP_TEXT.printq.markOk);
-      btn.textContent='✓ '+APP_TEXT.printq.printedBadge;
-    })
-    .catch(e=>{ btn.disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
 }
 
 function resetReceive(){
@@ -304,107 +289,9 @@ function resetReceive(){
   $('recvVbcInput').focus();
 }
 
-/* ===== พิมพ์ฉลาก thermal (T-008) ===== */
-/** แปลง 'YYYY-MM-DD' → 'DD/MM/YY' สำหรับโชว์บนฉลาก */
-function fmtExpiry(d){
-  const p=String(d||'').split('-');
-  if(p.length!==3) return d||'';
-  return p[2]+'/'+p[1]+'/'+p[0].slice(2);
-}
-/** วันที่วันนี้ตามเครื่อง 'YYYY-MM-DD' — fallback ของ received_at (T-031) */
-function todayLocalIso(){
-  const d=new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-/* ===== เทมเพลตฉลาก (T-008 / T-015) — เลย์เอาต์ใหม่ ใช้ร่วมทั้งพิมพ์จริง + พรีวิว =====
-   layout: แถวบน = [ QR ใหญ่ ~15mm (พระเอก) | ชื่อสินค้า 2 บรรทัด + กล่อง EXP ]
-           แถวล่าง = Code128 เต็มความกว้าง (แท่งอ้วน) + เลข human-readable ใต้แท่ง
-   เหตุผลที่จัดแบบนี้:
-     • QR ใหญ่ขึ้นจาก 9mm → 15mm (โมดูลใหญ่ขึ้น ~2 เท่า) + ECC=H + quiet zone 4 โมดูล
-       → กล้อง iPhone (ZXing) โฟกัสติด อ่านชัวร์ขึ้นมาก
-     • Code128 กินเต็ม 50mm + preserveAspectRatio=none → แท่งอ้วนเต็มที่ ไม่ผอม เครื่องยิง 1D อ่านง่าย
-     • ชื่อสินค้า clamp 2 บรรทัด (เลิกตัด "..." กลางคำ) ; EXP อยู่ในกล่องเส้นขอบ เด่น อ่านง่าย */
-const LABEL_CSS=[
-  '@page{size:50mm 25mm;margin:0;}',
-  '*{margin:0;padding:0;box-sizing:border-box;}',
-  'html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
-  // [T-015] label 24mm < หน้า 25mm = เผื่อ slack 1mm กัน rounding ดันหน้าว่าง (บทเรียน JOURNAL bug #2)
-  // [T-031] padding ข้าง 1.5→1.2mm + head gap 1.6→1.3mm — คืนพื้นที่แนวนอนให้แถววันที่ (EXP+รับ) พอดี
-  '.label{width:50mm;height:24mm;padding:0.7mm 1.2mm;display:flex;flex-direction:column;',
-    'overflow:hidden;color:#000;background:#fff;',
-    'font-family:"IBM Plex Sans Thai","IBM Plex Sans","Segoe UI",Tahoma,sans-serif;}',
-  '.label+.label{page-break-before:always;}',
-  '.lb-head{display:flex;gap:1.3mm;flex:1;min-height:0;align-items:center;}',
-  '.lb-qr{flex:0 0 14mm;width:14mm;height:14mm;}',
-  '.lb-qr svg{width:100%;height:100%;display:block;}',
-  '.lb-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1mm;}',
-  '.lb-name{font-size:8pt;font-weight:700;line-height:1.12;display:-webkit-box;',
-    '-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}',
-  // [T-031] แถววันที่: กล่อง EXP (เด่น มีกรอบ) + วันที่รับ (ตัวเล็ก ไม่มีกรอบ) อยู่บรรทัดเดียวกัน
-  // ⚠️ พื้นที่ 50mm ตึงมาก — ขนาด/gap ด้านล่างวัดแล้วเหลือ slack ~1mm พอดี อย่าขยายโดยไม่วัดใหม่
-  //    (วัดผ่าน ?labelpreview + getBoundingClientRect — ข้อความวันที่ยาวคงที่ DD/MM/YY เสมอ)
-  '.lb-dates{display:flex;align-items:center;gap:0.8mm;}',
-  '.lb-exp{font-size:7pt;font-weight:700;line-height:1;white-space:nowrap;',
-    'border:0.3mm solid #000;border-radius:1mm;padding:0.5mm 0.9mm;}',
-  '.lb-recv{font-size:6pt;font-weight:400;line-height:1;white-space:nowrap;}',
-  '.lb-bc{width:100%;height:5mm;}',
-  '.lb-bc svg{width:100%;height:100%;display:block;}',
-  '.lb-code{font-family:"IBM Plex Mono","Courier New",monospace;font-size:7.5pt;font-weight:700;',
-    'text-align:center;letter-spacing:2px;white-space:nowrap;line-height:1;margin-top:0.6mm;}'
-].join('');
-
-// สร้าง .label หนึ่งใบ — item = {name, exp (ข้อความเต็มเช่น "EXP 04/06/69" หรือ ''), recv ("รับ 12/06/69" หรือ ''), code}
-function buildLabelItem(item){
-  // [T-020] ใช้ esc() กลาง (top-level) แทน local
-  // Code128 — เต็มความกว้าง แท่งอ้วน ; margin 20 (=10 โมดูล) = quiet zone ครบสเปก
-  // preserveAspectRatio=none → ยืดเต็ม 100% × ความสูงคงที่ (ไม่ letterbox จนแท่งแคบ)
-  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-  JsBarcode(svg, item.code, {format:'CODE128', displayValue:false, margin:20, height:60, width:2});
-  // ⚠️ getAttribute คืน "404px" (มี px) → parseFloat ก่อน ไม่งั้น viewBox ผิดสเปก
-  const bw=parseFloat(svg.getAttribute('width')), bh=parseFloat(svg.getAttribute('height'));
-  svg.setAttribute('viewBox','0 0 '+bw+' '+bh);
-  svg.setAttribute('preserveAspectRatio','none');
-  svg.removeAttribute('width'); svg.removeAttribute('height');
-  const bcHtml=new XMLSerializer().serializeToString(svg);
-  // QR — ค่าเดียวกับ Code128 ; ECC=H (กันเลอะ 30% ; 8 หลัก ยังเป็น version 1 = 21 โมดูล โมดูลใหญ่)
-  // margin 4 = quiet zone ตามสเปก QR (เดิม 2 → น้อยไป iPhone หาขอบไม่เจอ)
-  let qrHtml='';
-  if(typeof qrcode!=='undefined'){
-    const qr=qrcode(0,'H'); qr.addData(item.code); qr.make();
-    qrHtml=qr.createSvgTag({scalable:true, margin:4});
-  }
-  return '<div class="label">'+
-      '<div class="lb-head">'+
-        '<div class="lb-qr">'+qrHtml+'</div>'+
-        '<div class="lb-info">'+
-          '<div class="lb-name">'+esc(item.name)+'</div>'+
-          ((item.exp||item.recv)?
-            '<div class="lb-dates">'+
-              (item.exp?'<div class="lb-exp">'+esc(item.exp)+'</div>':'')+
-              (item.recv?'<div class="lb-recv">'+esc(item.recv)+'</div>':'')+
-            '</div>':'')+
-        '</div>'+
-      '</div>'+
-      '<div class="lb-bc">'+bcHtml+'</div>'+
-      '<div class="lb-code">'+esc(item.code)+'</div>'+
-    '</div>';
-}
-function buildLabelBody(items){ return items.map(buildLabelItem).join(''); }
-function buildLabelDoc(items){
-  return '<!doctype html><html><head><meta charset="utf-8"><title>labels</title>'+
-    '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;700&family=IBM+Plex+Sans+Thai:wght@400;700&family=IBM+Plex+Mono:wght@700&display=swap" rel="stylesheet">'+
-    '<style>'+LABEL_CSS+'</style></head><body>'+buildLabelBody(items)+'</body></html>';
-}
-
-// [T-032] แปลงข้อมูลงาน/ผลรับเข้า → รายการฉลาก (จุดเดียว ใช้ทั้งหน้ารับเข้า + แท็บรอปริ้น)
-// src = {product_name, expiry(YYYY-MM-DD), received(YYYY-MM-DD), unit_barcodes[]}
-function buildLabelItems(src){
-  const expTxt = src.expiry ? ('EXP '+fmtExpiry(src.expiry)) : '';
-  // 'รับ' ไม่เว้นวรรค — จงใจ ประหยัดความกว้าง (slack แถววันที่เหลือ ~1mm)
-  const recvTxt = src.received ? ('รับ'+fmtExpiry(src.received)) : '';
-  return src.unit_barcodes.map(code=>({name:src.product_name||'', exp:expTxt, recv:recvTxt, code}));
-}
-
+/* ===== พิมพ์ฉลาก thermal (T-008) =====
+   [T-033] เทมเพลต+core พิมพ์ทั้งหมดย้ายไป labels.js (single source ใช้ร่วม print-history.html)
+   ที่นี่เหลือเฉพาะส่วนที่ผูกกับหน้าแอป: printLabels(lastReceive) + ตัวอย่างฉลากสด + ?labelpreview */
 function printLabels(){
   if(!lastReceive || !lastReceive.unit_barcodes || !lastReceive.unit_barcodes.length){
     toast(APP_TEXT.print.noLabels,false); return;
@@ -412,35 +299,40 @@ function printLabels(){
   printLabelItems(buildLabelItems(lastReceive));
 }
 
-// core พิมพ์ — รับ items ที่ประกอบแล้ว (T-032: แยกออกมาให้แท็บรอปริ้นเรียกซ้ำได้)
-function printLabelItems(items){
-  if(!items||!items.length){ toast(APP_TEXT.print.noLabels,false); return; }
-  if(typeof JsBarcode==='undefined'){ toast(APP_TEXT.print.libMissing,false); return; }
-  // ── พิมพ์ผ่าน hidden iframe แล้วสั่ง frame.contentWindow.print() ────────────
-  // สั่ง print() บน iframe ที่เราคุมเอง → @page ของ iframe ถูกใช้จริง (ไม่หมุน 90°)
-  const doc = buildLabelDoc(items);
-  let frame=document.getElementById('labelPrintFrame');
-  if(!frame){
-    frame=document.createElement('iframe');
-    frame.id='labelPrintFrame';
-    frame.setAttribute('aria-hidden','true');
-    frame.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
-    document.body.appendChild(frame);
+/* ===== ตัวอย่างฉลากสดในแท็บรับเข้า (T-033) =====
+   render จากเทมเพลตเดียวกับพิมพ์จริง (labels.js) → เห็นบนจอ = ที่ออกจากเครื่องพิมพ์
+   อัปเดตตามที่กรอก: ชนิด/ชื่อใหม่/วันหมดอายุ/จำนวน · เลขตัวอย่าง 00000000 (เลขจริงออกตอนกดรับ) */
+function renderLabelSample(){
+  const box=$('labelSample');
+  if(!box || typeof JsBarcode==='undefined') return;
+  if(!document.getElementById('labelSampleCss')){
+    const st=document.createElement('style');
+    st.id='labelSampleCss';
+    // .label/.lb-* ไม่ชน style อื่นบนจอ (style.css ใช้ชื่อนี้เฉพาะใน @media print — legacy T-008)
+    // ตัด selector ครอบจักรวาล (*{...} กับ html,body{...}) ออก — กันไปรีเซ็ต style ทั้งแอป
+    st.textContent=LABEL_CSS
+      .replace('*{margin:0;padding:0;box-sizing:border-box;}','')
+      .replace('html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}','')
+      +'#labelSample{zoom:1.55;width:max-content;margin-top:4px;}'
+      +'#labelSample .label{outline:0.3mm dashed #5a6470;}'
+      +'#labelSample .label *{margin:0;padding:0;box-sizing:border-box;}';
+    document.head.appendChild(st);
   }
-  const fdoc=frame.contentWindow.document;
-  fdoc.open(); fdoc.write(doc); fdoc.close();
-  // [T-025] รอฟอนต์โหลดเสร็จจริงก่อนสั่งพิมพ์ (แทน setTimeout มั่วๆ ที่อาจสั้นไปบนเน็ตช้า)
-  const fDoc = frame.contentWindow.document;
-  (fDoc.fonts && fDoc.fonts.ready ? fDoc.fonts.ready : Promise.resolve())
-    .then(function(){
-      try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
-      catch(e){ toast(tf(APP_TEXT.print.failTpl,{msg:e.message}),false); }
-    })
-    .catch(function(){
-      // fallback กรณี fonts.ready reject (เช่น iOS Safari เก่า)
-      try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
-      catch(e){ toast(tf(APP_TEXT.print.failTpl,{msg:e.message}),false); }
-    });
+  let name='';
+  if(isNewProduct){ name=$('newProductName').value.trim(); }
+  else {
+    const sel=$('recvProductSel');
+    const opt=sel.options[sel.selectedIndex];
+    if(sel.value && opt) name=opt.textContent.replace(/\s*\([^)]*\)\s*$/,'');
+  }
+  const qty=Math.max(1, Number($('recvQty').value)||1);
+  const items=buildLabelItems({
+    product_name: name||'(ชื่อน้ำยา)',
+    expiry:       $('recvExpiry').value.trim(),
+    received:     todayLocalIso(),
+    unit_barcodes:['00000000'].concat(Array(qty-1).fill('')).slice(0,qty),
+  });
+  box.innerHTML=buildLabelItem(items[0]);   // โชว์ดวงแรก (1/N)
 }
 
 /* ===== พรีวิวฉลากบนจอ (dev) — เปิด index.html?labelpreview=00000027,00000028 =====
@@ -453,7 +345,8 @@ function initLabelPreview(){
   const name=q.get('name')||'On call Advance Cleaner Premium';
   const expRaw=q.get('exp')||'2026-06-04';
   const recvRaw=q.get('recv')||todayLocalIso();   // [T-031] override ได้ด้วย ?recv=YYYY-MM-DD
-  const items=codes.map(c=>({name, exp:'EXP '+fmtExpiry(expRaw), recv:'รับ'+fmtExpiry(recvRaw), code:c}));
+  // [T-033] ใช้ buildLabelItems (labels.js) → ได้ seq n/N ตรงกับของจริง
+  const items=buildLabelItems({product_name:name, expiry:expRaw, received:recvRaw, unit_barcodes:codes});
   $('login').classList.add('hidden'); $('app').classList.add('hidden');
   const st=document.createElement('style');
   st.textContent=LABEL_CSS+
@@ -468,69 +361,6 @@ function initLabelPreview(){
     '<h3 style="margin-top:34px">Zoom × 8</h3><div class="pv-zoomwrap">'+buildLabelBody(items)+'</div>';
   document.body.appendChild(div);
   return true;
-}
-
-/* ===== รอปริ้น (T-032) — PrintJob: pending FIFO + printed ล่าสุดปริ้นซ้ำได้ ===== */
-let printJobsCache={};   // job_id → job (ไว้ประกอบฉลากตอนกดพิมพ์ ไม่ยิง server ซ้ำ)
-
-function initPrintTab(){
-  $('printSummary').textContent=APP_TEXT.common.loading;
-  apiGet('listPrintJobs')
-    .then(res=>{
-      if(!res||!res.ok){ $('printSummary').textContent=(res&&res.error)||APP_TEXT.printq.loadFail; return; }
-      renderPrintJobs(res);
-    })
-    .catch(e=>{ $('printSummary').textContent=tf(APP_TEXT.common.errorTpl,{msg:e.message}); });
-}
-
-function renderPrintJobs(res){
-  const jobs=res.jobs||[];
-  printJobsCache={}; jobs.forEach(j=>{ printJobsCache[j.job_id]=j; });
-  const n=res.pending_count||0;
-  $('printSummary').innerHTML = n>0 ? tf(APP_TEXT.printq.summaryTpl,{n}) : APP_TEXT.printq.summaryEmpty;
-  // ป้ายจำนวนค้างบนปุ่มแท็บ — เห็นตั้งแต่ยังไม่กดเข้ามา
-  $('tab-btn-print').textContent = APP_TEXT.tabs.print + (n>0?' ('+n+')':'');
-  if(!jobs.length){ $('printList').innerHTML=`<div class="empty">${APP_TEXT.printq.empty}</div>`; return; }
-  $('printList').innerHTML=jobs.map(j=>{
-    const pending=j.status==='pending';
-    // [T-020 pattern] job_id เข้า onclick → sanitize เหลือ [\w-]
-    const jid=String(j.job_id||'').replace(/[^\w-]/g,'');
-    const recv=fmtExpiry(String(j.received_at||'').slice(0,10));
-    const meta=tf(APP_TEXT.printq.metaTpl,{recv:esc(recv), lot:esc(j.lot_no||j.lot_id), n:j.qty, user:esc(j.created_by||'-')});
-    const badge=pending
-      ? `<span class="badge warn">${APP_TEXT.printq.pendingBadge}</span>`
-      : `<span class="muted">${tf(APP_TEXT.printq.printedMetaTpl,{user:esc(j.printed_by||'-'), date:esc(String(j.printed_at||'').slice(0,10))})}</span>`;
-    const btns=pending
-      ? `<button class="green sm" onclick="doPrintJob('${jid}')">${APP_TEXT.printq.printBtn}</button>
-         <button class="ghost sm" onclick="doMarkPrinted('${jid}',this)">${APP_TEXT.printq.markBtn}</button>`
-      : `<button class="ghost sm" onclick="doPrintJob('${jid}')">${APP_TEXT.printq.reprintBtn}</button>`;
-    return `<div class="item ${pending?'':'issued'}"><div class="top">
-      <div><div class="name">${esc(j.product_name)}</div><div class="meta">${esc(j.job_id)} · ${meta}</div></div>
-      ${badge}</div>
-      <div class="row" style="margin-top:8px">${btns}</div></div>`;
-  }).join('');
-}
-
-function doPrintJob(jid){
-  const j=printJobsCache[jid];
-  if(!j){ toast(APP_TEXT.print.noLabels,false); return; }
-  printLabelItems(buildLabelItems({
-    product_name: j.product_name,
-    expiry:       j.expiry_date,
-    received:     String(j.received_at||'').slice(0,10),
-    unit_barcodes:j.unit_barcodes,
-  }));
-}
-
-function doMarkPrinted(jid, btn){
-  if(btn) btn.disabled=true;
-  apiPost({action:'markPrintJobPrinted', job_id:jid, user:CURRENT.user_id})
-    .then(res=>{
-      if(!res||!res.ok){ if(btn) btn.disabled=false; toast(tf(APP_TEXT.printq.markFailTpl,{msg:(res&&res.error)||''}),false); return; }
-      toast(APP_TEXT.printq.markOk);
-      initPrintTab();   // โหลดใหม่ — งานย้ายไปกลุ่ม printed + ตัวเลขป้ายแท็บอัปเดต
-    })
-    .catch(e=>{ if(btn) btn.disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
 }
 
 /* ===== เช็คสต๊อก (T-016) — accordion รายชนิด → รายล็อต FEFO ===== */
@@ -703,6 +533,11 @@ function renderExpiry(res){
 $('issueInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doIssue(); });
 $('pinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 $('recvVbcInput').addEventListener('keydown', e=>{ if(e.key==='Enter') scanVendorBarcode(); });
+// [T-033] ตัวอย่างฉลากสด — อัปเดตทุกครั้งที่ข้อมูลบนฉลากเปลี่ยน (ชนิด/ชื่อใหม่/วันหมดอายุ/จำนวน)
+['recvProductSel','recvExpiry','recvQty','newProductName'].forEach(id=>{
+  $(id).addEventListener('input', renderLabelSample);
+  $(id).addEventListener('change', renderLabelSample);
+});
 
 document.addEventListener('DOMContentLoaded', ()=>{
   applyAppText();
