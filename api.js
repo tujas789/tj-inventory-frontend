@@ -68,6 +68,18 @@ const DEMO = (function(){
   const nameOf  = pid => (products.find(p=>p.product_id===pid)||{}).name || pid;
   const lotNoOf = lid => (lots.find(l=>l.lot_id===lid)||{}).lot_no || lid;
 
+  // [T-032] งานปริ้นตัวอย่าง: 1 ค้าง + 1 ปิดแล้ว (ลองพิมพ์ซ้ำได้)
+  const printJobs=[
+    {job_id:'PJ000001', lot_id:'L000012', product_id:'P0001', qty:3,
+     unit_barcodes:['00000001','00000002','00000003'],
+     received_at:ymd(today)+'T09:00:00+07:00', status:'pending', created_by:'somchai', printed_at:'', printed_by:''},
+    {job_id:'PJ000002', lot_id:'L000020', product_id:'P0001', qty:2,
+     unit_barcodes:['00000201','00000202'],
+     received_at:addDays(-1)+'T15:00:00+07:00', status:'printed', created_by:'somchai',
+     printed_at:addDays(-1)+'T17:30:00+07:00', printed_by:'admin'},
+  ];
+  let seqJob=2;
+
   const handlers = {
     getUsers(){ return {ok:true, users:users.map(u=>({...u}))}; },
     verifyPin(p){
@@ -96,7 +108,28 @@ const DEMO = (function(){
       const codes=[];
       for(let i=0;i<Number(p.qty);i++){ const c=String(++seqUnit).padStart(8,'0');
         units.push({unit_barcode:c, lot_id:lid, product_id:pid, status:'in_stock'}); codes.push(c); }
-      return {ok:true, product_id:pid, product_name:pname, lot_id:lid, unit_barcodes:codes, txn_id:'T'+String(++seqTxn).padStart(8,'0')};
+      // [T-032] รับเข้า = เกิด PrintJob pending อัตโนมัติ (เหมือน backend จริง)
+      const now=new Date();
+      const recvAt=ymd(today)+'T'+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':00+07:00';
+      const jid='PJ'+String(++seqJob).padStart(6,'0');
+      printJobs.push({job_id:jid, lot_id:lid, product_id:pid, qty:codes.length, unit_barcodes:codes.slice(),
+        received_at:recvAt, status:'pending', created_by:p.user||'demo', printed_at:'', printed_by:''});
+      return {ok:true, product_id:pid, product_name:pname, lot_id:lid, unit_barcodes:codes,
+        txn_id:'T'+String(++seqTxn).padStart(8,'0'), received_at:recvAt, print_job_id:jid};
+    },
+    listPrintJobs(){   // [T-032] join ชื่อ/วันหมดอายุเหมือน backend — pending FIFO ก่อน printed ใหม่สุด
+      const expOf=lid=>(lots.find(l=>l.lot_id===lid)||{}).expiry_date||'';
+      const toJob=j=>({...j, unit_barcodes:j.unit_barcodes.slice(), product_name:nameOf(j.product_id), lot_no:lotNoOf(j.lot_id), expiry_date:expOf(j.lot_id)});
+      const pending=printJobs.filter(j=>j.status==='pending').map(toJob).sort((a,b)=>a.received_at<b.received_at?-1:1);
+      const printed=printJobs.filter(j=>j.status==='printed').map(toJob).sort((a,b)=>a.printed_at>b.printed_at?-1:1);
+      return {ok:true, jobs:pending.concat(printed.slice(0,10)), pending_count:pending.length};
+    },
+    markPrintJobPrinted(p){   // [T-032]
+      const j=printJobs.find(x=>x.job_id===String(p.job_id));
+      if(!j) return {ok:false, error:'ไม่พบงานปริ้น (เดโม)'};
+      if(j.status==='printed') return {ok:true, job_id:j.job_id, already_printed:true};
+      j.status='printed'; j.printed_at=ymd(today)+'T18:00:00+07:00'; j.printed_by=p.user||'demo';
+      return {ok:true, job_id:j.job_id};
     },
     issueForUI(p){
       const u=units.find(x=>x.unit_barcode===String(p.unit_barcode).trim());

@@ -46,6 +46,7 @@ const APP_TEXT = {
   tabs: {
     issue:   '📤 เบิก',
     receive: '📥 รับเข้า',
+    print:   '🖨️ รอปริ้น',
     stock:   '📊 สต๊อก',
     expiry:  '⏰ หมดอายุ',
   },
@@ -95,12 +96,31 @@ const APP_TEXT = {
     barcodeListHead:    'unit_barcode ที่สร้าง:',
     printBtn:           '🖨️ พิมพ์ฉลาก',
     printBtnTpl:        '🖨️ พิมพ์ฉลาก {n} ดวง',
+    markPrintedBtn:     '✓ ปริ้นแล้ว — ปิดงานปริ้น',   // [T-032]
     nextBtn:            '🔄 รับเข้าชุดถัดไป',
   },
   print: {
     noLabels:   'ไม่มีฉลากให้พิมพ์',
     libMissing: 'โหลดตัวสร้าง barcode ไม่ได้ (เช็กเน็ต)',
     failTpl:    'พิมพ์ไม่สำเร็จ: {msg}',
+  },
+  // [T-032] แท็บรอปริ้น (PrintJob — CONTEXT Business Rule 7)
+  printq: {
+    title:          '🖨️ งานปริ้นสติกเกอร์',
+    refreshBtn:     '🔄 รีเฟรช',
+    summaryTpl:     'ค้างปริ้น <b>{n}</b> งาน',
+    summaryEmpty:   'ไม่มีงานค้างปริ้น',
+    empty:          '🎉 ยังไม่มีงานปริ้น — รับเข้าแล้วงานจะมารอที่นี่',
+    pendingBadge:   'รอปริ้น',
+    printedBadge:   'ปริ้นแล้ว',
+    metaTpl:        'รับ {recv} · Lot {lot} · {n} ดวง · โดย {user}',
+    printedMetaTpl: 'ปิดโดย {user} · {date}',
+    printBtn:       '🖨️ พิมพ์',
+    reprintBtn:     '🖨️ พิมพ์ซ้ำ',
+    markBtn:        '✓ ปริ้นแล้ว',
+    markOk:         '✓ ปิดงานปริ้นแล้ว',
+    markFailTpl:    'ปิดงานไม่สำเร็จ: {msg}',
+    loadFail:       'โหลดรายการไม่ได้',
   },
   stock: {
     title:             '📊 สต๊อกคงเหลือ',

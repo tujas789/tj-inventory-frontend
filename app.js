@@ -67,7 +67,7 @@ let receiveTabInited=false;
 let expiryTabInited=false;
 let stockTabInited=false;
 function showTab(name){
-  ['issue','receive','stock','expiry'].forEach(n=>{
+  ['issue','receive','print','stock','expiry'].forEach(n=>{
     $('tab-'+n).classList.toggle('hidden', n!==name);
     const btn=$('tab-btn-'+n);
     btn.classList.toggle('active', n===name);
@@ -75,6 +75,8 @@ function showTab(name){
   });
   if(name==='issue'){ stopCam(); $('issueInput').focus(); }
   if(name==='receive' && !receiveTabInited){ receiveTabInited=true; initReceiveTab(); }
+  // [T-032] รอปริ้นโหลดใหม่ทุกครั้งที่เปิด (ไม่ cache) — งานมาจากเครื่องอื่นได้ ลิสต์ค้างคือผิดวัตถุประสงค์
+  if(name==='print'){ initPrintTab(); }
   if(name==='stock' && !stockTabInited){ stockTabInited=true; initStockTab(); }
   if(name==='expiry' && !expiryTabInited){ expiryTabInited=true; initExpiryTab(); }
 }
@@ -253,6 +255,7 @@ function doReceive(){
         lot_no:       payload.lot_no,
         lot_id:       res.lot_id,
         unit_barcodes:res.unit_barcodes,
+        print_job_id: res.print_job_id||'',   // [T-032] ไว้ปิดงานจากการ์ดผลรับเข้าได้เลย
       };
       renderReceiveResult(res);
     })
@@ -270,7 +273,24 @@ function renderReceiveResult(res){
        <div class="monospace">${res.unit_barcodes.map(esc).join('<br>')}</div>
      </div>`;
   $('printBtn').textContent=tf(APP_TEXT.receive.printBtnTpl,{n:res.unit_barcodes.length});
+  // [T-032] ปุ่มปิดงานปริ้น — โชว์เฉพาะเมื่อ server สร้าง PrintJob สำเร็จ (backend เก่า/สร้างพลาด = ซ่อน)
+  const mk=$('markPrintedBtn');
+  mk.classList.toggle('hidden', !(res.print_job_id));
+  mk.disabled=false; mk.textContent=APP_TEXT.receive.markPrintedBtn;
   $('recvResult').classList.remove('hidden');
+}
+
+// [T-032] ปิดงานปริ้นจากการ์ดผลรับเข้า (รับ+ปริ้นเครื่องเดียวกัน — ไม่ต้องไปแท็บรอปริ้น)
+function markReceivePrinted(){
+  if(!lastReceive||!lastReceive.print_job_id) return;
+  const btn=$('markPrintedBtn'); btn.disabled=true;
+  apiPost({action:'markPrintJobPrinted', job_id:lastReceive.print_job_id, user:CURRENT.user_id})
+    .then(res=>{
+      if(!res||!res.ok){ btn.disabled=false; toast(tf(APP_TEXT.printq.markFailTpl,{msg:(res&&res.error)||''}),false); return; }
+      toast(APP_TEXT.printq.markOk);
+      btn.textContent='✓ '+APP_TEXT.printq.printedBadge;
+    })
+    .catch(e=>{ btn.disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
 }
 
 function resetReceive(){
@@ -376,19 +396,28 @@ function buildLabelDoc(items){
     '<style>'+LABEL_CSS+'</style></head><body>'+buildLabelBody(items)+'</body></html>';
 }
 
+// [T-032] แปลงข้อมูลงาน/ผลรับเข้า → รายการฉลาก (จุดเดียว ใช้ทั้งหน้ารับเข้า + แท็บรอปริ้น)
+// src = {product_name, expiry(YYYY-MM-DD), received(YYYY-MM-DD), unit_barcodes[]}
+function buildLabelItems(src){
+  const expTxt = src.expiry ? ('EXP '+fmtExpiry(src.expiry)) : '';
+  // 'รับ' ไม่เว้นวรรค — จงใจ ประหยัดความกว้าง (slack แถววันที่เหลือ ~1mm)
+  const recvTxt = src.received ? ('รับ'+fmtExpiry(src.received)) : '';
+  return src.unit_barcodes.map(code=>({name:src.product_name||'', exp:expTxt, recv:recvTxt, code}));
+}
+
 function printLabels(){
   if(!lastReceive || !lastReceive.unit_barcodes || !lastReceive.unit_barcodes.length){
     toast(APP_TEXT.print.noLabels,false); return;
   }
+  printLabelItems(buildLabelItems(lastReceive));
+}
+
+// core พิมพ์ — รับ items ที่ประกอบแล้ว (T-032: แยกออกมาให้แท็บรอปริ้นเรียกซ้ำได้)
+function printLabelItems(items){
+  if(!items||!items.length){ toast(APP_TEXT.print.noLabels,false); return; }
   if(typeof JsBarcode==='undefined'){ toast(APP_TEXT.print.libMissing,false); return; }
   // ── พิมพ์ผ่าน hidden iframe แล้วสั่ง frame.contentWindow.print() ────────────
   // สั่ง print() บน iframe ที่เราคุมเอง → @page ของ iframe ถูกใช้จริง (ไม่หมุน 90°)
-  const expTxt = lastReceive.expiry ? ('EXP '+fmtExpiry(lastReceive.expiry)) : '';
-  // 'รับ' ไม่เว้นวรรค — จงใจ ประหยัดความกว้าง (slack แถววันที่เหลือ ~1mm)
-  const recvTxt = lastReceive.received ? ('รับ'+fmtExpiry(lastReceive.received)) : '';
-  const items = lastReceive.unit_barcodes.map(code=>({
-    name: lastReceive.product_name||'', exp: expTxt, recv: recvTxt, code: code
-  }));
   const doc = buildLabelDoc(items);
   let frame=document.getElementById('labelPrintFrame');
   if(!frame){
@@ -439,6 +468,69 @@ function initLabelPreview(){
     '<h3 style="margin-top:34px">Zoom × 8</h3><div class="pv-zoomwrap">'+buildLabelBody(items)+'</div>';
   document.body.appendChild(div);
   return true;
+}
+
+/* ===== รอปริ้น (T-032) — PrintJob: pending FIFO + printed ล่าสุดปริ้นซ้ำได้ ===== */
+let printJobsCache={};   // job_id → job (ไว้ประกอบฉลากตอนกดพิมพ์ ไม่ยิง server ซ้ำ)
+
+function initPrintTab(){
+  $('printSummary').textContent=APP_TEXT.common.loading;
+  apiGet('listPrintJobs')
+    .then(res=>{
+      if(!res||!res.ok){ $('printSummary').textContent=(res&&res.error)||APP_TEXT.printq.loadFail; return; }
+      renderPrintJobs(res);
+    })
+    .catch(e=>{ $('printSummary').textContent=tf(APP_TEXT.common.errorTpl,{msg:e.message}); });
+}
+
+function renderPrintJobs(res){
+  const jobs=res.jobs||[];
+  printJobsCache={}; jobs.forEach(j=>{ printJobsCache[j.job_id]=j; });
+  const n=res.pending_count||0;
+  $('printSummary').innerHTML = n>0 ? tf(APP_TEXT.printq.summaryTpl,{n}) : APP_TEXT.printq.summaryEmpty;
+  // ป้ายจำนวนค้างบนปุ่มแท็บ — เห็นตั้งแต่ยังไม่กดเข้ามา
+  $('tab-btn-print').textContent = APP_TEXT.tabs.print + (n>0?' ('+n+')':'');
+  if(!jobs.length){ $('printList').innerHTML=`<div class="empty">${APP_TEXT.printq.empty}</div>`; return; }
+  $('printList').innerHTML=jobs.map(j=>{
+    const pending=j.status==='pending';
+    // [T-020 pattern] job_id เข้า onclick → sanitize เหลือ [\w-]
+    const jid=String(j.job_id||'').replace(/[^\w-]/g,'');
+    const recv=fmtExpiry(String(j.received_at||'').slice(0,10));
+    const meta=tf(APP_TEXT.printq.metaTpl,{recv:esc(recv), lot:esc(j.lot_no||j.lot_id), n:j.qty, user:esc(j.created_by||'-')});
+    const badge=pending
+      ? `<span class="badge warn">${APP_TEXT.printq.pendingBadge}</span>`
+      : `<span class="muted">${tf(APP_TEXT.printq.printedMetaTpl,{user:esc(j.printed_by||'-'), date:esc(String(j.printed_at||'').slice(0,10))})}</span>`;
+    const btns=pending
+      ? `<button class="green sm" onclick="doPrintJob('${jid}')">${APP_TEXT.printq.printBtn}</button>
+         <button class="ghost sm" onclick="doMarkPrinted('${jid}',this)">${APP_TEXT.printq.markBtn}</button>`
+      : `<button class="ghost sm" onclick="doPrintJob('${jid}')">${APP_TEXT.printq.reprintBtn}</button>`;
+    return `<div class="item ${pending?'':'issued'}"><div class="top">
+      <div><div class="name">${esc(j.product_name)}</div><div class="meta">${esc(j.job_id)} · ${meta}</div></div>
+      ${badge}</div>
+      <div class="row" style="margin-top:8px">${btns}</div></div>`;
+  }).join('');
+}
+
+function doPrintJob(jid){
+  const j=printJobsCache[jid];
+  if(!j){ toast(APP_TEXT.print.noLabels,false); return; }
+  printLabelItems(buildLabelItems({
+    product_name: j.product_name,
+    expiry:       j.expiry_date,
+    received:     String(j.received_at||'').slice(0,10),
+    unit_barcodes:j.unit_barcodes,
+  }));
+}
+
+function doMarkPrinted(jid, btn){
+  if(btn) btn.disabled=true;
+  apiPost({action:'markPrintJobPrinted', job_id:jid, user:CURRENT.user_id})
+    .then(res=>{
+      if(!res||!res.ok){ if(btn) btn.disabled=false; toast(tf(APP_TEXT.printq.markFailTpl,{msg:(res&&res.error)||''}),false); return; }
+      toast(APP_TEXT.printq.markOk);
+      initPrintTab();   // โหลดใหม่ — งานย้ายไปกลุ่ม printed + ตัวเลขป้ายแท็บอัปเดต
+    })
+    .catch(e=>{ if(btn) btn.disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
 }
 
 /* ===== เช็คสต๊อก (T-016) — accordion รายชนิด → รายล็อต FEFO ===== */
