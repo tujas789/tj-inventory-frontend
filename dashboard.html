@@ -7,26 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Thai+Looped:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tokens.css?v=20260613e">
   <style>
     /* ─── Reset & Root ─── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ★ ธีม Cream Instrument (T-036) — คงชื่อตัวแปรเดิม (JS อ้าง --red-ink/--muted/--dan ฯลฯ) remap ค่าเป็นครีม */
-    :root {
-      --bg:#faf9f5; --surface:#efe9de; --surface-2:#e7e0d3; --border:#ddd5c7; --border-2:rgba(20,20,19,0.07);
-      --ink:#141413; --ink-2:#3d3d3a; --muted:#6c6a64;
-      --gold:#cc785c; --gold2:#a9583e; --green:#5db872; --dan:#c64545;
-      --coral:#cc785c; --orange:#fa520f; --sun:#ffa110;
-      --font-sans: 'Inter','Sukhumvit Set','Noto Sans Thai Looped',-apple-system,'Segoe UI',sans-serif;
-      --font-serif: 'Cormorant Garamond','Sukhumvit Set','Noto Sans Thai Looped',Garamond,serif;
-      --font-mono: 'JetBrains Mono','IBM Plex Mono',Consolas,ui-monospace,monospace;
-      /* pastel accents → ครีม tint */
-      --red-bg:rgba(198,69,69,0.12);    --red-ink:#c64545;
-      --blue-bg:rgba(93,184,166,0.16);  --blue-ink:#3f8f7e;   /* teal สำหรับ "เบิก" */
-      --green-bg:rgba(93,184,114,0.16); --green-ink:#2f7a45;
-      --yellow-bg:rgba(204,120,92,0.16);--yellow-ink:#a9583e; /* coral tint สำหรับ "ใกล้หมด" */
-    }
-
+    /* ★ ธีม Cream Instrument — token/สี ทั้งหมดย้ายไป tokens.css แล้ว (T-037, source of truth เดียว)
+       JS ยังอ้าง --red-ink/--muted/--dan ฯลฯ ได้ตามเดิม (tokens.css ทำ alias ให้) — ต้อง <link tokens.css> ก่อน <style> นี้ */
     html { scroll-behavior: smooth; }
     /* ใช้โดย JS (toggleLots / filterStockTable) — เดิมไม่เคยนิยาม ทำให้แถวรายล็อตไม่ถูกซ่อน (bug) */
     .hidden { display: none !important; }

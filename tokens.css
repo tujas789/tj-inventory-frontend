@@ -1,0 +1,49 @@
+/* tokens.css — SINGLE SOURCE OF TRUTH ของธีม "Cream Instrument" (T-037)
+   ★ แก้สีที่นี่ที่เดียว → มีผลทั้ง index.html + dashboard.html + print-history.html
+   ★ เปลี่ยนคาแรกเตอร์ทั้งแอป: แก้ --ci-primary ค่าเดียว (coral พระเอก)
+
+   โครงสร้าง:
+   (1) central palette --ci-*   = ค่าสีจริง แก้ที่นี่
+   (2) legacy alias             = ชี้กลับ central — ⚠️ ห้ามเปลี่ยนชื่อ alias
+       (app.js อ้าง var(--dan), dashboard JS อ้าง --red-ink/--muted ฯลฯ — map ไม่ใช่ rename)
+   ต้อง <link> ไฟล์นี้ "ก่อน" style.css เสมอ (ไม่งั้นตัวแปรไม่มา) */
+:root{
+  /* ─── central palette (แก้ที่นี่ที่เดียว) ─── */
+  --ci-canvas:#faf9f5;     /* พื้นครีม */
+  --ci-card:#efe9de;       /* พื้นการ์ดหลัก */
+  --ci-ink:#141413;        /* หมึกเข้ม */
+  --ci-primary:#cc785c;    /* coral พระเอก (ปุ่ม/eyebrow/แท็บ) */
+  --ci-primary-2:#a9583e;  /* coral เข้ม (ขอบ/hover) */
+  --ci-orange:#fa520f;
+  --ci-sun:#ffa110;
+  --ci-green:#5db872;
+  --ci-danger:#c64545;
+
+  /* ─── fonts (ใช้ร่วมทั้งแอป) ─── */
+  --serif:'Cormorant Garamond','Sukhumvit Set','Noto Sans Thai Looped',Garamond,serif;
+  --sans:'Inter','Sukhumvit Set','Noto Sans Thai Looped',-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace;
+
+  /* ─── alias: style.css (index.html, print-history.html) ─── */
+  --bg:var(--ci-canvas);
+  --card:var(--ci-card); --card2:#f5f0e8; --panel:#e7e4dc;
+  --ink:var(--ci-ink); --line:var(--ci-ink);
+  --txt:#3d3d3a; --mut:#6c6a64; --mut2:#8e8b82; --hair:#e6dfd8;
+  --coral:var(--ci-primary); --coral2:var(--ci-primary-2);
+  --orange:var(--ci-orange); --sun:var(--ci-sun);
+  --green:var(--ci-green); --dan:var(--ci-danger);
+  --screen:#e7f3ea; --screenink:#2f7a45;
+  --gold:var(--ci-primary); --gold2:var(--ci-primary-2);
+  --r-btn:8px; --r-card:12px;
+  --p-border:1.5px; --p-shadow:4px;
+
+  /* ─── alias: dashboard.html ─── */
+  --surface:var(--ci-card); --surface-2:#e7e0d3;
+  --border:#ddd5c7; --border-2:rgba(20,20,19,0.07);
+  --ink-2:#3d3d3a; --muted:#6c6a64;
+  --font-sans:var(--sans); --font-serif:var(--serif); --font-mono:var(--mono);
+  --red-bg:rgba(198,69,69,0.12);     --red-ink:var(--ci-danger);
+  --blue-bg:rgba(93,184,166,0.16);   --blue-ink:#3f8f7e;   /* teal สำหรับ "เบิก" */
+  --green-bg:rgba(93,184,114,0.16);  --green-ink:#2f7a45;
+  --yellow-bg:rgba(204,120,92,0.16); --yellow-ink:var(--ci-primary-2); /* coral tint "ใกล้หมด" */
+}

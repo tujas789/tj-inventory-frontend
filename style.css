@@ -2,26 +2,8 @@
    พื้น editorial อุ่นนุ่ม (ครีม + serif + ปุ่ม sunset gradient) = base
    แทรก "แผงเครื่องมือ" เหลี่ยม+เงาแข็ง+mono เป็นจังหวะ (ช่องสแกน/ตัวเลขสต๊อก) = accent
    หมายเหตุ: คงชื่อตัวแปร legacy (--gold/--dan ฯลฯ) ไว้ — app.js อ้าง var(--dan) + กันรูลอื่นพัง
-   ★ เปลี่ยนคาแรกเตอร์ทั้งแอป: แก้ --coral/--gold ค่าเดียว */
-  :root{
-    /* — พื้นผิว (Cream Sunset) — */
-    --bg:#faf9f5; --card:#efe9de; --card2:#f5f0e8; --panel:#e7e4dc;
-    /* — หมึก / ตัวอักษร — */
-    --ink:#141413; --line:#141413; --txt:#3d3d3a; --mut:#6c6a64; --mut2:#8e8b82; --hair:#e6dfd8;
-    /* — สีพระเอก + สถานะ — */
-    --coral:#cc785c; --coral2:#a9583e; --orange:#fa520f; --sun:#ffa110;
-    --green:#5db872; --dan:#c64545; --screen:#e7f3ea; --screenink:#2f7a45;
-    /* legacy alias (กันโค้ดเก่า/รูลที่อ้างชื่อเดิม) */
-    --gold:#cc785c; --gold2:#a9583e;
-    /* — มุมโค้ง (Cream: ปุ่ม 8 · การ์ด 12) — */
-    --r-btn:8px; --r-card:12px;
-    /* — instrument accent — */
-    --p-border:1.5px; --p-shadow:4px;
-    /* — ฟอนต์ — */
-    --serif:'Cormorant Garamond','Sukhumvit Set','Noto Sans Thai Looped',Garamond,serif;
-    --sans:'Inter','Sukhumvit Set','Noto Sans Thai Looped',-apple-system,'Segoe UI',sans-serif;
-    --mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace;
-  }
+   ★ เปลี่ยนคาแรกเตอร์ทั้งแอป: แก้ --ci-primary ค่าเดียวใน tokens.css
+   ⚠️ token/สี ทั้งหมดย้ายไป tokens.css แล้ว (T-037) — ต้อง <link tokens.css> ก่อนไฟล์นี้ */
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   /* พื้น dot-grid ทั้งหน้า = บรรยากาศ "กระดาษเครื่องมือ" (instrument) บนพื้นครีม */
   body{ margin:0; font-family:var(--sans); font-size:16px; line-height:1.6;
