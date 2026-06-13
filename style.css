@@ -1,77 +1,102 @@
-/* style.css — ธีม Binance ทั้งแอป (แตกจาก index.html — T-030, ห้ามมี logic) */
-  /* ===== ธีม Binance ===== ดำเข้ม + ทอง #FCD535 + เขียว/แดง buy-sell */
-  :root{ --bg:#0b0e11; --card:#181a20; --card2:#1e2026; --line:#2b3139; --txt:#eaecef; --mut:#848e9c;
-         --gold:#fcd535; --gold2:#f0b90b; --green:#0ecb81; --dan:#f6465d; }
+/* style.css — ธีม "Instrument Panel" (T-035 — แตกจาก index.html ตาม T-030, ห้ามมี logic)
+   กระดาษครีม + dot-grid · ขอบหมึกหนา 1.5px เหลี่ยม · เงาแข็ง offset · ส้ม #ff4f00 accent
+   หมายเหตุ: คงชื่อตัวแปรเดิม (--gold ฯลฯ) ไว้ — app.js อ้าง var(--dan) และกันโค้ดอื่นพัง */
+  :root{ --bg:#e7e4dc; --card:#fafaf7; --card2:#f1efe6; --line:#14110d; --hair:#cfcabd;
+         --txt:#14110d; --ink2:#4f4a40; --mut:#8c8678;
+         --gold:#ff4f00; --gold2:#e64700; --green:#0e8a4f; --dan:#d11a2a;
+         --screen:#c7e8d0; --screenink:#0c2b18; }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body{ margin:0; font-family:"IBM Plex Sans Thai","IBM Plex Sans","Segoe UI",system-ui,sans-serif;
-        background:var(--bg); color:var(--txt); }
-  header{ background:var(--card); padding:14px 16px; border-bottom:1px solid var(--line);
+        background:var(--bg);
+        background-image:radial-gradient(rgba(20,17,13,.05) 1px, transparent 1.4px);
+        background-size:15px 15px; color:var(--txt); }
+  header{ background:var(--bg); padding:14px 16px; border-bottom:1.5px solid var(--line);
           display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:10; }
-  header h1{ font-size:18px; margin:0; }
-  header .who{ margin-left:auto; font-size:12px; color:var(--mut); display:flex; align-items:center; gap:8px; }
+  header h1{ font-size:17px; margin:0; font-weight:700; letter-spacing:.3px; }
+  header .who{ margin-left:auto; font-size:12px; color:var(--ink2); display:flex; align-items:center; gap:8px;
+               font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; }
   header .who b{ color:var(--txt); }
   /* ─── Tab bar ─── */
-  .tabbar{ display:flex; background:var(--card); border-bottom:2px solid var(--line); }
-  .tab-btn{ flex:1; padding:13px 10px; border:none; background:none; color:var(--mut); font-size:14px;
-            font-weight:600; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; transition:.15s; }
-  .tab-btn.active{ color:var(--gold); border-bottom-color:var(--gold); }
+  .tabbar{ display:flex; background:var(--card); border-bottom:1.5px solid var(--line); }
+  .tab-btn{ flex:1; padding:13px 8px; border:none; border-right:1px solid var(--hair); background:var(--card);
+            color:var(--ink2); font-size:13.5px; font-family:inherit;
+            font-weight:600; cursor:pointer; }
+  .tab-btn:last-child{ border-right:none; }
+  .tab-btn.active{ background:var(--gold); color:#fff; font-weight:700; }
   .tab-btn:active{ background:var(--card2); }
+  .tab-btn.active:active{ background:var(--gold2); }
   /* [T-025] focus-visible — กรอบชัดเมื่อใช้คีย์บอร์ด แต่ไม่รบกวนตอนกดมือถือ */
   :focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
   .tab-btn:focus-visible{ outline-offset:-2px; }
   /* ─── Layout ─── */
   .wrap{ max-width:560px; margin:0 auto; padding:16px; }
-  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
-  .card h2{ font-size:15px; margin:0 0 12px; display:flex; align-items:center; gap:8px; }
-  label{ display:block; font-size:13px; color:var(--mut); margin:10px 0 4px; }
-  input,select{ width:100%; padding:12px; border-radius:8px; border:1px solid var(--line);
-                background:#0b0e11; color:var(--txt); font-size:16px; }
+  .card{ background:var(--card); border:1.5px solid var(--line); border-radius:0; padding:16px;
+         margin-bottom:16px; box-shadow:4px 4px 0 var(--line); }
+  .card h2{ font-size:15px; margin:0 0 12px; display:flex; align-items:center; gap:8px; font-weight:700; }
+  label{ display:block; font-size:11px; color:var(--mut); margin:12px 0 4px;
+         font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:1px; text-transform:uppercase; }
+  input,select{ width:100%; padding:12px; border-radius:0; border:1.5px solid var(--line);
+                background:#fff; color:var(--txt); font-size:16px; font-family:inherit; }
+  input::placeholder{ color:var(--mut); }
   input:focus,select:focus{ outline:none; border-color:var(--gold); }
   .scanbox input{ font-size:22px; font-weight:700; letter-spacing:1px; text-align:center;
-                  border-color:var(--gold); padding:16px; }
-  button{ border:none; border-radius:8px; padding:13px 16px; font-size:15px; font-weight:700;
-          cursor:pointer; color:#0b0e11; background:var(--gold); width:100%; margin-top:12px; }
-  button:active{ background:var(--gold2); }
-  button.green{ background:var(--gold); color:#0b0e11; } button.green:active{ background:var(--gold2); }
-  button.ghost{ background:var(--card2); border:1px solid var(--line); color:var(--txt); }
-  button.sm{ width:auto; padding:8px 12px; font-size:13px; margin:0; }
+                  font-family:"IBM Plex Mono",monospace; border-color:var(--gold); padding:16px; }
+  /* placeholder ไทยยาว — ลดขนาด+ฟอนต์ปกติ กันล้นกรอบ (ค่า barcode จริงยัง mono ใหญ่) */
+  .scanbox input::placeholder{ font-family:"IBM Plex Sans Thai",sans-serif; font-size:15px;
+                               font-weight:500; letter-spacing:0; }
+  button{ border:1.5px solid var(--line); border-radius:0; padding:13px 16px; font-size:14px; font-weight:700;
+          font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:.3px;
+          cursor:pointer; color:#fff; background:var(--gold); width:100%; margin-top:12px;
+          box-shadow:3px 3px 0 var(--line); transition:.1s; }
+  button:active{ background:var(--gold2); transform:translate(3px,3px); box-shadow:none; }
+  button.green{ background:var(--gold); color:#fff; } button.green:active{ background:var(--gold2); }
+  button.ghost{ background:var(--card); border:1.5px solid var(--line); color:var(--txt); }
+  button.ghost:active{ background:var(--card2); }
+  button.sm{ width:auto; padding:8px 12px; font-size:12px; margin:0; box-shadow:2px 2px 0 var(--line); }
+  button.sm:active{ transform:translate(2px,2px); box-shadow:none; }
   button:disabled{ opacity:.5; }
   .row{ display:flex; gap:10px; } .row>*{ flex:1; }
-  hr.div{ border:none; border-top:1px solid var(--line); margin:14px 0; }
-  .sub-label{ font-size:13px; color:var(--gold); font-weight:600; margin-bottom:6px; }
-  .monospace{ font-family:monospace; font-size:13px; background:var(--card2); border-radius:8px;
-              padding:10px; max-height:160px; overflow-y:auto; line-height:1.8; word-break:break-all; }
+  hr.div{ border:none; border-top:1px dashed var(--hair); margin:14px 0; }
+  .sub-label{ font-size:13px; color:var(--gold); font-weight:700; margin-bottom:6px; }
+  .monospace{ font-family:"IBM Plex Mono",monospace; font-size:13px; background:#fff; border:1px solid var(--hair);
+              border-radius:0; padding:10px; max-height:160px; overflow-y:auto; line-height:1.8; word-break:break-all; }
   /* ─── Toast ─── */
   .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:30px; z-index:50;
-          padding:14px 20px; border-radius:12px; font-weight:700; font-size:16px; color:#fff;
-          box-shadow:0 8px 30px rgba(0,0,0,.4); opacity:0; transition:.25s; pointer-events:none;
+          padding:14px 20px; border-radius:0; border:1.5px solid var(--line); font-weight:700; font-size:16px;
+          color:#fff; box-shadow:4px 4px 0 var(--line); opacity:0; transition:.25s; pointer-events:none;
           max-width:90%; text-align:center; }
   .toast.show{ opacity:1; bottom:40px; }
-  .toast.ok{ background:var(--green); color:#0b0e11; } .toast.err{ background:var(--dan); }
+  .toast.ok{ background:var(--screen); color:var(--screenink); }
+  .toast.err{ background:var(--dan); box-shadow:4px 4px 0 var(--gold); }
   /* ─── List items ─── */
-  .item{ border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:8px; background:var(--card2); }
+  .item{ border:1.5px solid var(--line); border-radius:0; padding:12px; margin-bottom:10px; background:var(--card); }
   .item .top{ display:flex; justify-content:space-between; align-items:center; }
   .item .name{ font-weight:700; }
-  .item .meta{ font-size:12px; color:var(--mut); margin-top:4px; }
+  .item .meta{ font-size:12px; color:var(--ink2); margin-top:4px;
+               font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; }
   .muted{ color:var(--mut); font-size:13px; }
-  .empty{ text-align:center; color:var(--mut); padding:30px 10px; }
+  .empty{ text-align:center; color:var(--mut); padding:30px 10px;
+          font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:1px; }
   /* ─── badge วันหมดอายุ (T-009) ─── */
-  .badge{ font-size:12px; font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap; }
-  .badge.expired{ background:var(--dan); color:#fff; }
-  .badge.warn{ background:var(--gold); color:#0b0e11; }
-  .item.expired{ border-color:var(--dan); }
-  .item.warn{ border-color:var(--gold); }
+  .badge{ font-size:11px; font-weight:700; padding:3px 9px; border-radius:0; white-space:nowrap;
+          font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:.5px;
+          border:1.5px solid var(--line); }
+  .badge.expired{ background:var(--dan); color:#fff; border-color:var(--dan); }
+  .badge.warn{ background:var(--gold); color:#fff; border-color:var(--gold); }
+  .item.expired{ border-color:var(--dan); box-shadow:3px 3px 0 var(--dan); }
+  .item.warn{ border-color:var(--gold); box-shadow:3px 3px 0 var(--gold); }
   /* ─── เช็คสต๊อก accordion (T-016) ─── */
   .stock-row .top{ cursor:pointer; }
   .stock-qty{ display:flex; align-items:center; gap:6px; font-size:15px; }
-  .stock-qty b{ color:var(--gold); font-size:18px; }
+  .stock-qty b{ color:var(--gold); font-size:18px; font-family:"IBM Plex Mono",monospace; }
   .stock-row.zero .stock-qty b{ color:var(--mut); }
   .chev{ color:var(--mut); transition:.15s; display:inline-block; }
   .stock-row.open .chev{ transform:rotate(180deg); }
-  .lot-detail{ margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
-  .lot-head{ font-size:12px; color:var(--gold); font-weight:600; margin-bottom:4px; }
+  .lot-detail{ margin-top:10px; border-top:1px dashed var(--hair); padding-top:8px; }
+  .lot-head{ font-size:11px; color:var(--gold); font-weight:600; margin-bottom:4px;
+             font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:1px; text-transform:uppercase; }
   .lot-line{ display:flex; justify-content:space-between; align-items:center; gap:8px;
-             padding:7px 0; border-bottom:1px solid var(--line); font-size:13px; }
+             padding:7px 0; border-bottom:1px solid var(--hair); font-size:13px; }
   .lot-line:last-child{ border-bottom:none; }
   .lot-no{ font-weight:600; }
   .lot-right{ display:flex; align-items:center; gap:8px; white-space:nowrap; }
@@ -82,19 +107,23 @@
   .unit-detail{ margin:0 0 8px; padding:2px 0 2px 12px; border-left:2px solid var(--line); }
   .unit-line{ display:flex; justify-content:space-between; align-items:center; gap:8px;
               padding:4px 0; font-size:12px; }
-  .unit-line .bc{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  .unit-line .bc{ font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
                   font-weight:600; letter-spacing:.5px; }
   .unit-line.issued .bc{ color:var(--mut); text-decoration:line-through; }
   .unit-ok{ color:var(--green); font-weight:600; }
   .hidden{ display:none !important; }   /* !important: กัน #login{display:flex} ชนะ class นี้ */
-  #reader{ border-radius:12px; overflow:hidden; margin-top:12px; }
+  #reader{ border:1.5px solid var(--line); border-radius:0; overflow:hidden; margin-top:12px; }
   /* ─── Login overlay ─── */
-  #login{ position:fixed; inset:0; background:var(--bg); z-index:100; display:flex;
+  #login{ position:fixed; inset:0; background:var(--bg);
+          background-image:radial-gradient(rgba(20,17,13,.05) 1px, transparent 1.4px);
+          background-size:15px 15px; z-index:100; display:flex;
           align-items:center; justify-content:center; padding:20px; }
   #login .box{ width:100%; max-width:360px; }
-  #login h1{ text-align:center; font-size:22px; margin:0 0 6px; }
-  #login .sub{ text-align:center; color:var(--mut); font-size:13px; margin-bottom:20px; }
-  #pinInput{ font-size:28px; text-align:center; letter-spacing:8px; font-weight:700; }
+  #login h1{ text-align:center; font-size:22px; margin:0 0 6px; font-weight:700; }
+  #login .sub{ text-align:center; color:var(--ink2); font-size:13px; margin-bottom:20px; }
+  #login .card{ box-shadow:6px 6px 0 var(--line); }
+  #pinInput{ font-size:28px; text-align:center; letter-spacing:8px; font-weight:700;
+             font-family:"IBM Plex Mono",monospace; }
 
   /* ===== พิมพ์ฉลาก thermal (T-008) — สติกเกอร์ 50 x 25 mm (ด้านยาว = แกน barcode) ===== */
   /* ปรับขนาดสติกเกอร์ที่นี่ที่เดียว ถ้าเปลี่ยนม้วน */
