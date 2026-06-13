@@ -1,132 +1,164 @@
-/* style.css — ธีม "Instrument Panel" (T-035 — แตกจาก index.html ตาม T-030, ห้ามมี logic)
-   กระดาษครีม + dot-grid · ขอบหมึกหนา 1.5px เหลี่ยม · เงาแข็ง offset · ส้ม #ff4f00 accent
-   หมายเหตุ: คงชื่อตัวแปรเดิม (--gold ฯลฯ) ไว้ — app.js อ้าง var(--dan) และกันโค้ดอื่นพัง */
-  :root{ --bg:#e7e4dc; --card:#fafaf7; --card2:#f1efe6; --line:#14110d; --hair:#cfcabd;
-         --txt:#14110d; --ink2:#4f4a40; --mut:#8c8678;
-         --gold:#ff4f00; --gold2:#e64700; --green:#0e8a4f; --dan:#d11a2a;
-         --screen:#c7e8d0; --screenink:#0c2b18; }
+/* style.css — ธีม "Cream Instrument" (T-036 — แตกจาก index.html ตาม T-030, ห้ามมี logic)
+   พื้น editorial อุ่นนุ่ม (ครีม + serif + ปุ่ม sunset gradient) = base
+   แทรก "แผงเครื่องมือ" เหลี่ยม+เงาแข็ง+mono เป็นจังหวะ (ช่องสแกน/ตัวเลขสต๊อก) = accent
+   หมายเหตุ: คงชื่อตัวแปร legacy (--gold/--dan ฯลฯ) ไว้ — app.js อ้าง var(--dan) + กันรูลอื่นพัง
+   ★ เปลี่ยนคาแรกเตอร์ทั้งแอป: แก้ --coral/--gold ค่าเดียว */
+  :root{
+    /* — พื้นผิว (Cream Sunset) — */
+    --bg:#faf9f5; --card:#efe9de; --card2:#f5f0e8; --panel:#e7e4dc;
+    /* — หมึก / ตัวอักษร — */
+    --ink:#141413; --line:#141413; --txt:#3d3d3a; --mut:#6c6a64; --mut2:#8e8b82; --hair:#e6dfd8;
+    /* — สีพระเอก + สถานะ — */
+    --coral:#cc785c; --coral2:#a9583e; --orange:#fa520f; --sun:#ffa110;
+    --green:#5db872; --dan:#c64545; --screen:#e7f3ea; --screenink:#2f7a45;
+    /* legacy alias (กันโค้ดเก่า/รูลที่อ้างชื่อเดิม) */
+    --gold:#cc785c; --gold2:#a9583e;
+    /* — มุมโค้ง (Cream: ปุ่ม 8 · การ์ด 12) — */
+    --r-btn:8px; --r-card:12px;
+    /* — instrument accent — */
+    --p-border:1.5px; --p-shadow:4px;
+    /* — ฟอนต์ — */
+    --serif:'Cormorant Garamond','Sukhumvit Set','Noto Sans Thai Looped',Garamond,serif;
+    --sans:'Inter','Sukhumvit Set','Noto Sans Thai Looped',-apple-system,'Segoe UI',sans-serif;
+    --mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace;
+  }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body{ margin:0; font-family:"IBM Plex Sans Thai","IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  /* พื้น dot-grid ทั้งหน้า = บรรยากาศ "กระดาษเครื่องมือ" (instrument) บนพื้นครีม */
+  body{ margin:0; font-family:var(--sans); font-size:16px; line-height:1.6;
         background:var(--bg);
-        background-image:radial-gradient(rgba(20,17,13,.05) 1px, transparent 1.4px);
-        background-size:15px 15px; color:var(--txt); }
-  header{ background:var(--bg); padding:14px 16px; border-bottom:1.5px solid var(--line);
+        background-image:radial-gradient(rgba(20,20,19,.045) 1px, transparent 1.4px);
+        background-size:15px 15px;
+        color:var(--txt); -webkit-font-smoothing:antialiased; }
+  /* header: ขอบล่างหมึกหนา (instrument) + dot-grid ต่อเนื่องกับพื้น */
+  header{ background:var(--bg);
+          background-image:radial-gradient(rgba(20,20,19,.045) 1px, transparent 1.4px);
+          background-size:15px 15px;
+          padding:14px 16px; border-bottom:1.5px solid var(--ink);
           display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:10; }
-  header h1{ font-size:17px; margin:0; font-weight:700; letter-spacing:.3px; }
-  header .who{ margin-left:auto; font-size:12px; color:var(--ink2); display:flex; align-items:center; gap:8px;
-               font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; }
-  header .who b{ color:var(--txt); }
-  /* ─── Tab bar ─── */
-  .tabbar{ display:flex; background:var(--card); border-bottom:1.5px solid var(--line); }
-  .tab-btn{ flex:1; padding:13px 8px; border:none; border-right:1px solid var(--hair); background:var(--card);
-            color:var(--ink2); font-size:13.5px; font-family:inherit;
-            font-weight:600; cursor:pointer; }
-  .tab-btn:last-child{ border-right:none; }
-  .tab-btn.active{ background:var(--gold); color:#fff; font-weight:700; }
+  header h1{ font-family:var(--serif); font-weight:600; font-size:21px; letter-spacing:-.3px;
+             color:var(--ink); margin:0; }
+  header .who{ margin-left:auto; font-size:12px; color:var(--mut); display:flex; align-items:center; gap:8px;
+               font-family:var(--mono); }
+  header .who b{ color:var(--ink); font-weight:600; }
+  /* ─── Tab bar (editorial underline) ─── */
+  .tabbar{ display:flex; background:var(--bg); border-bottom:1.5px solid var(--ink); }
+  .tab-btn{ flex:1; padding:13px 8px; border:none; border-radius:0; background:none; color:var(--mut);
+            font-size:13.5px; font-family:var(--sans); font-weight:600; cursor:pointer; margin-top:0;
+            box-shadow:none; border-bottom:3px solid transparent; margin-bottom:-1.5px; }
+  .tab-btn.active{ color:var(--coral); border-bottom-color:var(--coral); }
   .tab-btn:active{ background:var(--card2); }
-  .tab-btn.active:active{ background:var(--gold2); }
   /* [T-025] focus-visible — กรอบชัดเมื่อใช้คีย์บอร์ด แต่ไม่รบกวนตอนกดมือถือ */
-  :focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+  :focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
   .tab-btn:focus-visible{ outline-offset:-2px; }
   /* ─── Layout ─── */
   .wrap{ max-width:560px; margin:0 auto; padding:16px; }
-  .card{ background:var(--card); border:1.5px solid var(--line); border-radius:0; padding:16px;
-         margin-bottom:16px; box-shadow:4px 4px 0 var(--line); }
-  .card h2{ font-size:15px; margin:0 0 12px; display:flex; align-items:center; gap:8px; font-weight:700; }
-  label{ display:block; font-size:11px; color:var(--mut); margin:12px 0 4px;
-         font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:1px; text-transform:uppercase; }
-  input,select{ width:100%; padding:12px; border-radius:0; border:1.5px solid var(--line);
-                background:#fff; color:var(--txt); font-size:16px; font-family:inherit; }
-  input::placeholder{ color:var(--mut); }
-  input:focus,select:focus{ outline:none; border-color:var(--gold); }
-  .scanbox input{ font-size:22px; font-weight:700; letter-spacing:1px; text-align:center;
-                  font-family:"IBM Plex Mono",monospace; border-color:var(--gold); padding:16px; }
+  /* การ์ด: ครีมอุ่น + ขอบหมึก + เงาแข็ง offset (instrument บนพื้น editorial) */
+  .card{ background:var(--card); border:1.5px solid var(--ink); border-radius:8px;
+         box-shadow:3px 3px 0 var(--ink); padding:18px; margin-bottom:18px; }
+  .card h2{ font-family:var(--serif); font-weight:600; font-size:20px; letter-spacing:-.2px; color:var(--ink);
+            margin:0 0 14px; display:flex; align-items:center; gap:8px; }
+  /* label = eyebrow: mono uppercase muted */
+  label{ display:block; font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:1px;
+         text-transform:uppercase; color:var(--mut); margin:14px 0 5px; }
+  input,select{ width:100%; padding:12px 14px; border-radius:var(--r-btn); border:1px solid var(--hair);
+                background:#fff; color:var(--ink); font-size:16px; font-family:var(--sans); }
+  input::placeholder{ color:var(--mut2); }
+  input:focus,select:focus{ outline:none; border-color:var(--coral); box-shadow:0 0 0 3px rgba(204,120,92,.15); }
+  /* ★ ช่องสแกน = "แผงเครื่องมือ": เหลี่ยม เงาแข็ง mono ใหญ่ — เป้ายิงเด่นสุด */
+  .scanbox input{ font-family:var(--mono); font-size:22px; font-weight:600; letter-spacing:1px; text-align:center;
+                  padding:16px; background:#fff; color:var(--ink);
+                  border:var(--p-border) solid var(--ink); border-radius:0;
+                  box-shadow:var(--p-shadow) var(--p-shadow) 0 var(--ink); }
+  .scanbox input:focus{ border-color:var(--ink); box-shadow:var(--p-shadow) var(--p-shadow) 0 var(--coral); }
   /* placeholder ไทยยาว — ลดขนาด+ฟอนต์ปกติ กันล้นกรอบ (ค่า barcode จริงยัง mono ใหญ่) */
-  .scanbox input::placeholder{ font-family:"IBM Plex Sans Thai",sans-serif; font-size:15px;
-                               font-weight:500; letter-spacing:0; }
-  button{ border:1.5px solid var(--line); border-radius:0; padding:13px 16px; font-size:14px; font-weight:700;
-          font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:.3px;
-          cursor:pointer; color:#fff; background:var(--gold); width:100%; margin-top:12px;
-          box-shadow:3px 3px 0 var(--line); transition:.1s; }
-  button:active{ background:var(--gold2); transform:translate(3px,3px); box-shadow:none; }
-  button.green{ background:var(--gold); color:#fff; } button.green:active{ background:var(--gold2); }
-  button.ghost{ background:var(--card); border:1.5px solid var(--line); color:var(--txt); }
-  button.ghost:active{ background:var(--card2); }
-  button.sm{ width:auto; padding:8px 12px; font-size:12px; margin:0; box-shadow:2px 2px 0 var(--line); }
+  .scanbox input::placeholder{ font-family:var(--sans); font-size:15px; font-weight:500; letter-spacing:0; }
+  /* ปุ่มหลัก = sunset gradient (จุดเชื่อม claude→mistral) */
+  /* ปุ่มหลัก = sunset gradient + ขอบหมึก + เงาแข็ง กดแล้วยุบไปที่เงา (instrument) */
+  button{ border:1.5px solid var(--ink); border-radius:var(--r-btn); padding:13px 18px; font-size:15px;
+          font-weight:600; letter-spacing:.2px; cursor:pointer; color:#fff; width:100%; margin-top:14px;
+          font-family:var(--sans); box-shadow:3px 3px 0 var(--ink);
+          background:linear-gradient(135deg,var(--coral) 0%,var(--orange) 55%,var(--sun) 100%);
+          transition:filter .12s, transform .08s, box-shadow .08s; }
+  button:hover{ filter:brightness(1.05); }
+  button:active{ filter:brightness(.95); transform:translate(3px,3px); box-shadow:none; }
+  button.green{ } /* ใช้ gradient เดียวกับปุ่มหลัก */
+  button.ghost{ background:var(--card); color:var(--ink); border:1.5px solid var(--ink); }
+  button.ghost:hover{ filter:none; background:var(--ink); color:var(--bg); }
+  button.sm{ width:auto; padding:9px 14px; font-size:13px; margin:0; box-shadow:2px 2px 0 var(--ink); }
   button.sm:active{ transform:translate(2px,2px); box-shadow:none; }
-  button:disabled{ opacity:.5; }
+  button:disabled{ opacity:.45; cursor:default; filter:none; }
   .row{ display:flex; gap:10px; } .row>*{ flex:1; }
-  hr.div{ border:none; border-top:1px dashed var(--hair); margin:14px 0; }
-  .sub-label{ font-size:13px; color:var(--gold); font-weight:700; margin-bottom:6px; }
-  .monospace{ font-family:"IBM Plex Mono",monospace; font-size:13px; background:#fff; border:1px solid var(--hair);
-              border-radius:0; padding:10px; max-height:160px; overflow-y:auto; line-height:1.8; word-break:break-all; }
+  hr.div{ border:none; border-top:1px solid var(--hair); margin:14px 0; }
+  /* sub-label = eyebrow coral */
+  .sub-label{ font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase;
+              color:var(--coral); margin-bottom:8px; }
+  .monospace{ font-family:var(--mono); font-size:13px; background:#fff; border:1px solid var(--hair);
+              border-radius:var(--r-btn); padding:12px; max-height:160px; overflow-y:auto;
+              line-height:1.8; word-break:break-all; }
   /* ─── Toast ─── */
   .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:30px; z-index:50;
-          padding:14px 20px; border-radius:0; border:1.5px solid var(--line); font-weight:700; font-size:16px;
-          color:#fff; box-shadow:4px 4px 0 var(--line); opacity:0; transition:.25s; pointer-events:none;
-          max-width:90%; text-align:center; }
+          padding:14px 20px; border:1.5px solid var(--ink); border-radius:0; font-weight:600; font-size:16px;
+          color:#fff; font-family:var(--sans); box-shadow:4px 4px 0 var(--ink);
+          opacity:0; transition:.25s; pointer-events:none; max-width:90%; text-align:center; }
   .toast.show{ opacity:1; bottom:40px; }
-  .toast.ok{ background:var(--screen); color:var(--screenink); }
-  .toast.err{ background:var(--dan); box-shadow:4px 4px 0 var(--gold); }
+  .toast.ok{ background:var(--green); }
+  .toast.err{ background:var(--dan); box-shadow:4px 4px 0 var(--coral2); }
   /* ─── List items ─── */
-  .item{ border:1.5px solid var(--line); border-radius:0; padding:12px; margin-bottom:10px; background:var(--card); }
+  .item{ border:1px solid var(--hair); border-radius:var(--r-btn); padding:13px; margin-bottom:10px; background:var(--card2); }
   .item .top{ display:flex; justify-content:space-between; align-items:center; }
-  .item .name{ font-weight:700; }
-  .item .meta{ font-size:12px; color:var(--ink2); margin-top:4px;
-               font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; }
+  .item .name{ font-weight:600; color:var(--ink); }
+  .item .meta{ font-size:12px; color:var(--mut); margin-top:4px; font-family:var(--mono); }
   .muted{ color:var(--mut); font-size:13px; }
-  .empty{ text-align:center; color:var(--mut); padding:30px 10px;
-          font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:1px; }
-  /* ─── badge วันหมดอายุ (T-009) ─── */
-  .badge{ font-size:11px; font-weight:700; padding:3px 9px; border-radius:0; white-space:nowrap;
-          font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:.5px;
-          border:1.5px solid var(--line); }
-  .badge.expired{ background:var(--dan); color:#fff; border-color:var(--dan); }
-  .badge.warn{ background:var(--gold); color:#fff; border-color:var(--gold); }
-  .item.expired{ border-color:var(--dan); box-shadow:3px 3px 0 var(--dan); }
-  .item.warn{ border-color:var(--gold); box-shadow:3px 3px 0 var(--gold); }
+  .empty{ text-align:center; color:var(--mut); padding:30px 10px; font-family:var(--mono); letter-spacing:.5px; }
+  /* ─── badge วันหมดอายุ (T-009) — pill ครีม tint ─── */
+  .badge{ display:inline-flex; align-items:center; font-family:var(--mono); font-size:11px; font-weight:500;
+          letter-spacing:.5px; padding:4px 11px; border-radius:9999px; white-space:nowrap; border:1px solid transparent; }
+  .badge.expired{ background:rgba(198,69,69,.14); color:var(--dan); }
+  .badge.warn{ background:rgba(204,120,92,.16); color:var(--coral2); }
+  .item.expired{ border-color:var(--dan); }
+  .item.warn{ border-color:var(--coral); }
   /* ─── เช็คสต๊อก accordion (T-016) ─── */
   .stock-row .top{ cursor:pointer; }
   .stock-qty{ display:flex; align-items:center; gap:6px; font-size:15px; }
-  .stock-qty b{ color:var(--gold); font-size:18px; font-family:"IBM Plex Mono",monospace; }
-  .stock-row.zero .stock-qty b{ color:var(--mut); }
+  /* readout = mono coral ใหญ่ (instrument) */
+  .stock-qty b{ color:var(--coral); font-size:20px; font-family:var(--mono); font-weight:600; }
+  .stock-row.zero .stock-qty b{ color:var(--mut2); }
   .chev{ color:var(--mut); transition:.15s; display:inline-block; }
   .stock-row.open .chev{ transform:rotate(180deg); }
-  .lot-detail{ margin-top:10px; border-top:1px dashed var(--hair); padding-top:8px; }
-  .lot-head{ font-size:11px; color:var(--gold); font-weight:600; margin-bottom:4px;
-             font-family:"IBM Plex Mono","IBM Plex Sans Thai",monospace; letter-spacing:1px; text-transform:uppercase; }
+  .lot-detail{ margin-top:10px; border-top:1px solid var(--hair); padding-top:8px; }
+  .lot-head{ font-family:var(--mono); font-size:10px; color:var(--coral); font-weight:600; letter-spacing:1px;
+             text-transform:uppercase; margin-bottom:6px; }
   .lot-line{ display:flex; justify-content:space-between; align-items:center; gap:8px;
              padding:7px 0; border-bottom:1px solid var(--hair); font-size:13px; }
   .lot-line:last-child{ border-bottom:none; }
-  .lot-no{ font-weight:600; }
+  .lot-no{ font-weight:600; color:var(--ink); }
   .lot-right{ display:flex; align-items:center; gap:8px; white-space:nowrap; }
   /* ─── รายชิ้นในล็อต (T-018) — drill-down ชั้นที่ 3 ─── */
   .lot-line{ cursor:pointer; }
   .lot-line .chev{ font-size:11px; }
   .lot-block.open .lot-line{ border-bottom:none; }
-  .unit-detail{ margin:0 0 8px; padding:2px 0 2px 12px; border-left:2px solid var(--line); }
+  .unit-detail{ margin:0 0 8px; padding:2px 0 2px 12px; border-left:2px solid var(--hair); }
   .unit-line{ display:flex; justify-content:space-between; align-items:center; gap:8px;
               padding:4px 0; font-size:12px; }
-  .unit-line .bc{ font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-                  font-weight:600; letter-spacing:.5px; }
-  .unit-line.issued .bc{ color:var(--mut); text-decoration:line-through; }
+  .unit-line .bc{ font-family:var(--mono); font-weight:500; letter-spacing:.5px; color:var(--ink); }
+  .unit-line.issued .bc{ color:var(--mut2); text-decoration:line-through; }
   .unit-ok{ color:var(--green); font-weight:600; }
   .hidden{ display:none !important; }   /* !important: กัน #login{display:flex} ชนะ class นี้ */
-  #reader{ border:1.5px solid var(--line); border-radius:0; overflow:hidden; margin-top:12px; }
+  #reader{ border:1px solid var(--hair); border-radius:var(--r-card); overflow:hidden; margin-top:12px; }
   /* ─── Login overlay ─── */
   #login{ position:fixed; inset:0; background:var(--bg);
-          background-image:radial-gradient(rgba(20,17,13,.05) 1px, transparent 1.4px);
+          background-image:radial-gradient(rgba(20,20,19,.045) 1px, transparent 1.4px);
           background-size:15px 15px; z-index:100; display:flex;
           align-items:center; justify-content:center; padding:20px; }
   #login .box{ width:100%; max-width:360px; }
-  #login h1{ text-align:center; font-size:22px; margin:0 0 6px; font-weight:700; }
-  #login .sub{ text-align:center; color:var(--ink2); font-size:13px; margin-bottom:20px; }
-  #login .card{ box-shadow:6px 6px 0 var(--line); }
-  #pinInput{ font-size:28px; text-align:center; letter-spacing:8px; font-weight:700;
-             font-family:"IBM Plex Mono",monospace; }
+  #login h1{ text-align:center; font-family:var(--serif); font-weight:600; font-size:30px; letter-spacing:-.5px;
+             color:var(--ink); margin:0 0 6px; }
+  #login .sub{ text-align:center; color:var(--mut); font-size:14px; margin-bottom:20px; }
+  #login .card{ box-shadow:5px 5px 0 var(--ink); }
+  #pinInput{ font-family:var(--mono); font-size:28px; text-align:center; letter-spacing:8px; font-weight:600; }
 
   /* ===== พิมพ์ฉลาก thermal (T-008) — สติกเกอร์ 50 x 25 mm (ด้านยาว = แกน barcode) ===== */
-  /* ปรับขนาดสติกเกอร์ที่นี่ที่เดียว ถ้าเปลี่ยนม้วน */
+  /* ปรับขนาดสติกเกอร์ที่นี่ที่เดียว ถ้าเปลี่ยนม้วน — ⚠️ ห้ามแตะ (พิมพ์จริงผ่านแล้ว) */
   :root{ --label-w:50mm; --label-h:25mm; }
   #printArea{ display:none; }
   @page{ size:50mm 25mm; margin:0; }
