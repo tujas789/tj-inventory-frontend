@@ -3,10 +3,10 @@
    ⚠️ ลำดับโหลด: app-text.js → api.js → labels.js → (สคริปต์หน้า)
    ต้องมี lib: JsBarcode + qrcode-generator (โหลดจาก CDN ใน <head> ของแต่ละหน้า)
 
-   เลย์เอาต์ (เจ้าของเคาะ 2026-06-12 ผ่าน mockup):
-     แถวบน  = [ QR 14mm | ชื่อ 2 บรรทัด + (กรอบ "รับ DD/MM/YY" + ลำดับกล่อง n/N) ]
-     แถวกลาง = Code128 เต็มกว้าง (แท่งอ้วน — ADR-0003)
-     แถวล่าง = EXP DD/MM/YY (ซ้าย ไร้กรอบ) + เลข barcode (ขวา)
+   เลย์เอาต์ "แบบ C" 2 คอลัมน์ (spec: frontend/design_handoff_barcode_label/README.md):
+     ซ้าย (12mm) = QR 12×12mm + ลำดับกล่อง n/N ใต้ QR
+     เส้นคั่นแนวตั้ง 0.2mm
+     ขวา (flex:1) = ชื่อ → รับ DD/MM/YY → Code128 เต็มกว้าง (แท่งอ้วน — ADR-0003) → EXP + เลข barcode
 */
 
 /** แปลง 'YYYY-MM-DD' → 'DD/MM/YY' สำหรับโชว์บนฉลาก */
@@ -27,28 +27,29 @@ const LABEL_CSS=[
   '@page{size:50mm 25mm;margin:0;}',
   '*{margin:0;padding:0;box-sizing:border-box;}',
   'html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
-  '.label{width:50mm;height:24mm;padding:0.7mm 1.2mm;display:flex;flex-direction:column;',
+  '.label{width:50mm;height:24mm;padding:1.1mm 1.4mm;display:flex;gap:1.6mm;',
     'overflow:hidden;color:#000;background:#fff;',
     'font-family:"IBM Plex Sans Thai","IBM Plex Sans","Segoe UI",Tahoma,sans-serif;}',
   '.label+.label{page-break-before:always;}',
-  '.lb-head{display:flex;gap:1.3mm;flex:1;min-height:0;align-items:center;}',
-  '.lb-qr{flex:0 0 14mm;width:14mm;height:14mm;}',
+  // คอลัมน์ซ้าย: QR + ลำดับ
+  '.lb-left{flex:0 0 12mm;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.8mm;}',
+  '.lb-qr{width:12mm;height:12mm;}',
   '.lb-qr svg{width:100%;height:100%;display:block;}',
-  '.lb-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1mm;}',
-  '.lb-name{font-size:8pt;font-weight:700;line-height:1.12;display:-webkit-box;',
-    '-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}',
-  // [T-033] กรอบ = วันที่รับ + ลำดับกล่อง n/N ข้างกรอบ
-  '.lb-dates{display:flex;align-items:center;gap:1.2mm;}',
-  '.lb-recv{font-size:7pt;font-weight:700;line-height:1;white-space:nowrap;',
-    'border:0.3mm solid #000;border-radius:1mm;padding:0.5mm 1mm;}',
-  '.lb-seq{font-size:8pt;font-weight:700;line-height:1;white-space:nowrap;}',
-  '.lb-bc{width:100%;height:5mm;}',
+  '.lb-seq{font-size:7pt;font-weight:700;line-height:1;white-space:nowrap;}',
+  // เส้นคั่น
+  '.lb-div{border-left:0.2mm solid #000;align-self:stretch;}',
+  // คอลัมน์ขวา
+  '.lb-right{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:0.9mm;}',
+  '.lb-name{font-size:8pt;font-weight:700;line-height:1.15;}',
+  '.lb-recv{font-size:6.5pt;font-weight:600;line-height:1;white-space:nowrap;}',
+  // Code128
+  '.lb-bc{width:100%;height:5.5mm;}',
   '.lb-bc svg{width:100%;height:100%;display:block;}',
-  // [T-033] แถวล่าง: EXP ซ้าย (ไร้กรอบ) + เลข barcode ขวา
-  '.lb-foot{display:flex;justify-content:space-between;align-items:baseline;margin-top:0.6mm;}',
-  '.lb-exp{font-size:7pt;font-weight:700;line-height:1;white-space:nowrap;}',
-  '.lb-code{font-family:"IBM Plex Mono","Courier New",monospace;font-size:7.5pt;font-weight:700;',
-    'letter-spacing:1.5px;white-space:nowrap;line-height:1;}'
+  // แถวล่าง
+  '.lb-foot{display:flex;justify-content:space-between;align-items:baseline;gap:1.2mm;}',
+  '.lb-exp{font-size:6.5pt;font-weight:700;line-height:1;white-space:nowrap;}',
+  '.lb-code{font-family:"IBM Plex Mono","Courier New",monospace;font-size:6.5pt;font-weight:700;',
+    'letter-spacing:1px;white-space:nowrap;line-height:1;}'
 ].join('');
 
 /** แปลงข้อมูล 1 ชุดรับเข้า → รายการฉลาก (จุดเดียว ใช้ทั้งรับเข้า/ปริ้นซ้ำ/ตัวอย่าง)
@@ -63,47 +64,49 @@ function buildLabelItems(src){
   }));
 }
 
-// สร้าง .label หนึ่งใบ — item = {name, recv, seq, exp, code}
 function buildLabelItem(item){
-  // Code128 — เต็มความกว้าง แท่งอ้วน ; margin 20 (=10 โมดูล) = quiet zone ครบสเปก
-  // preserveAspectRatio=none → ยืดเต็ม 100% × ความสูงคงที่ (ไม่ letterbox จนแท่งแคบ)
+  // Code128
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   JsBarcode(svg, item.code, {format:'CODE128', displayValue:false, margin:20, height:60, width:2});
-  // ⚠️ getAttribute คืน "404px" (มี px) → parseFloat ก่อน ไม่งั้น viewBox ผิดสเปก
   const bw=parseFloat(svg.getAttribute('width')), bh=parseFloat(svg.getAttribute('height'));
   svg.setAttribute('viewBox','0 0 '+bw+' '+bh);
   svg.setAttribute('preserveAspectRatio','none');
   svg.removeAttribute('width'); svg.removeAttribute('height');
+  // ⚠️ restore style หลัง JsBarcode ล้าง
+  svg.style.width='100%'; svg.style.height='100%'; svg.style.display='block';
   const bcHtml=new XMLSerializer().serializeToString(svg);
-  // QR — ค่าเดียวกับ Code128 ; ECC=H + quiet zone 4 โมดูล (iPhone อ่านชัวร์ — T-015)
+
+  // QR
   let qrHtml='';
   if(typeof qrcode!=='undefined'){
     const qr=qrcode(0,'H'); qr.addData(item.code); qr.make();
-    qrHtml=qr.createSvgTag({scalable:true, margin:4});
+    qrHtml=qr.createSvgTag({scalable:true, margin:3});
   }
+
   return '<div class="label">'+
-      '<div class="lb-head">'+
-        '<div class="lb-qr">'+qrHtml+'</div>'+
-        '<div class="lb-info">'+
-          '<div class="lb-name">'+esc(item.name)+'</div>'+
-          ((item.recv||item.seq)?
-            '<div class="lb-dates">'+
-              (item.recv?'<div class="lb-recv">'+esc(item.recv)+'</div>':'')+
-              (item.seq?'<div class="lb-seq">'+esc(item.seq)+'</div>':'')+
-            '</div>':'')+
-        '</div>'+
-      '</div>'+
+    // คอลัมน์ซ้าย
+    '<div class="lb-left">'+
+      '<div class="lb-qr">'+qrHtml+'</div>'+
+      (item.seq?'<div class="lb-seq">'+esc(item.seq)+'</div>':'')+
+    '</div>'+
+    // เส้นคั่น
+    '<div class="lb-div"></div>'+
+    // คอลัมน์ขวา
+    '<div class="lb-right">'+
+      '<div class="lb-name">'+esc(item.name)+'</div>'+
+      (item.recv?'<div class="lb-recv">'+esc(item.recv)+'</div>':'')+
       '<div class="lb-bc">'+bcHtml+'</div>'+
       '<div class="lb-foot">'+
         '<div class="lb-exp">'+esc(item.exp||'')+'</div>'+
         '<div class="lb-code">'+esc(item.code)+'</div>'+
       '</div>'+
-    '</div>';
+    '</div>'+
+  '</div>';
 }
 function buildLabelBody(items){ return items.map(buildLabelItem).join(''); }
 function buildLabelDoc(items){
   return '<!doctype html><html><head><meta charset="utf-8"><title>labels</title>'+
-    '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;700&family=IBM+Plex+Sans+Thai:wght@400;700&family=IBM+Plex+Mono:wght@700&display=swap" rel="stylesheet">'+
+    '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet">'+
     '<style>'+LABEL_CSS+'</style></head><body>'+buildLabelBody(items)+'</body></html>';
 }
 
