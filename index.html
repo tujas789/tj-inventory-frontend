@@ -81,6 +81,8 @@
       <div class="scanbox">
         <label data-text="receive.vbcLabel">ยิง barcode กล่อง (ค้นหาชนิดอัตโนมัติ)</label>
         <input id="recvVbcInput" autocomplete="off" data-text-placeholder="receive.vbcPlaceholder" placeholder="ยิง / พิมพ์ barcode กล่อง แล้ว Enter">
+        <button class="ghost" style="margin-top:8px" onclick="toggleCamRecv()" data-text="receive.camBtn">📷 ใช้กล้องมือถือ</button>
+        <div id="readerRecv" class="hidden"></div>
       </div>
       <label data-text="receive.pickLabel">หรือเลือกจากรายการ</label>
       <select id="recvProductSel">
@@ -158,9 +160,9 @@
 <div id="printArea"></div>
 
 <!-- T-030: JS แตกเป็นไฟล์ — ลำดับสำคัญ (app-text -> api -> app) และต้องอยู่ท้าย body (มี addEventListener นอก DOMContentLoaded) -->
-<script src="app-text.js?v=20260613"></script>
+<script src="app-text.js?v=20260614"></script>
 <script src="api.js?v=20260613"></script>
 <script src="labels.js?v=20260613"></script>
-<script src="app.js?v=20260613"></script>
+<script src="app.js?v=20260614"></script>
 </body>
 </html>

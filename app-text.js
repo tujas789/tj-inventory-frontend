@@ -59,6 +59,8 @@ const APP_TEXT = {
     productTitle:       '📦 เลือกชนิดน้ำยา',
     vbcLabel:           'ยิง barcode กล่อง (ค้นหาชนิดอัตโนมัติ)',
     vbcPlaceholder:     'ยิง / พิมพ์ barcode กล่อง แล้ว Enter',
+    camBtn:             '📷 ใช้กล้องมือถือ',
+    scannedTpl:         '📷 สแกนได้: {code} — กำลังค้นหาชนิด...',
     pickLabel:          'หรือเลือกจากรายการ',
     loadingProducts:    '— กำลังโหลด... —',
     noProducts:         '— ยังไม่มีชนิดน้ำยา —',

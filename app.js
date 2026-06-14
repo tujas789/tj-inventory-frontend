@@ -67,13 +67,14 @@ let receiveTabInited=false;
 let expiryTabInited=false;
 let stockTabInited=false;
 function showTab(name){
+  stopCam();   // กันกล้องค้างเปิดข้ามแท็บ (เบิก/รับเข้า ใช้กล้องร่วมกัน)
   ['issue','receive','stock','expiry'].forEach(n=>{
     $('tab-'+n).classList.toggle('hidden', n!==name);
     const btn=$('tab-btn-'+n);
     btn.classList.toggle('active', n===name);
     btn.setAttribute('aria-selected', n===name ? 'true' : 'false');  // [T-025]
   });
-  if(name==='issue'){ stopCam(); $('issueInput').focus(); }
+  if(name==='issue'){ $('issueInput').focus(); }
   if(name==='receive'){
     if(!receiveTabInited){ receiveTabInited=true; initReceiveTab(); }
     renderLabelSample();   // [T-033] ตัวอย่างฉลากสด
@@ -112,39 +113,66 @@ function renderRecent(){
   }).join('');
 }
 
-/* ===== กล้องสแกน (tab เบิกจ่าย) ===== */
+/* ===== กล้องสแกน (ใช้ร่วมหลายแท็บ: เบิกจ่าย + รับเข้า) ===== */
 let cam=null;
-function toggleCam(){
-  if(cam){ stopCam(); return; }
-  $('reader').classList.remove('hidden');
-  // [T-015] อ่าน Code128 จากกล้องให้ติด:
-  //   (1) จำกัด format = CODE_128 → ตัวอ่านโฟกัส ไม่ไล่ทุก type (เดิมอ่านไม่ติด)
-  //   (2) เปิด BarcodeDetector native ของเครื่อง (Android Chrome เร็ว/แม่นกว่า ZXing มาก ; iOS ไม่มี → fallback เอง)
+let camReaderId=null;   // จำว่าเปิดกล้องอยู่ที่ reader ตัวไหน (กดปุ่มเดิมซ้ำ = ปิด)
+// [T-042] config กล้องต่างกันต่อแท็บ (อย่ารวมเป็นค่าเดียว) — เหตุผล:
+//   · แท็บเบิก = ยิง "ฉลากเราเอง" (มี QR+Code128) บน iPhone ต้องพึ่ง QR → กรอบจัตุรัส (T-015/ADR-0003)
+//   · แท็บรับเข้า = ยิง "กล่องผู้ขาย" บาร์โค้ด 1D ทรงยาว (EAN/UPC/Code39/128) ไม่มี QR → กรอบแถบกว้าง
+// formats เป็น "ฟังก์ชัน" เพราะ Html5QrcodeSupportedFormats มาจาก lib (อ่านตอนเรียก ไม่ใช่ตอน parse)
+const SCAN_ISSUE = {
+  // QR ก่อน (iOS+Android ส่อง QR ชัวร์) + Code128 (เผื่อฉลากเก่า/Android) — T-015
+  formats: ()=>[Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128],
+  // qrbox "จัตุรัส" ตามรูปทรง QR (เดิมผืนผ้า 280×140 ไม่พอดี) — ปรับตามขนาดจอ
+  qrbox: (vw,vh)=>{ const m=Math.floor(Math.min(vw,vh)*0.72); return {width:m,height:m}; },
+};
+const SCAN_VENDOR = {
+  // กล่องผู้ขายหลากแบบ → รับ 1D ที่พบบ่อย + QR เผื่อไว้ (เจ้าของเคาะ 2026-06-14: ไม่แน่ใจฟอร์แมต)
+  formats: ()=>{ const F=Html5QrcodeSupportedFormats; return [F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.QR_CODE]; },
+  // qrbox "แถบนอน" ตามทรงบาร์โค้ด 1D — กว้าง 88% ของจอ × สูง ~42% ของความกว้าง (จูนต่อบนมือถือจริงได้)
+  qrbox: (vw,vh)=>{ const w=Math.floor(vw*0.88); const h=Math.floor(Math.min(w*0.42, vh*0.6)); return {width:w,height:h}; },
+};
+
+// เปิดกล้องที่ readerId ด้วย cfg (SCAN_ISSUE/SCAN_VENDOR); พบ barcode → onCode(rawText)
+//   ⚠️ ไม่ normalize ที่นี่ — ให้ callback จัดการเอง (เบิกตัดเหลือเลขตาม ADR-0003 / รับเข้าส่งค่าดิบกัน vendor มีตัวอักษร)
+function startCamScan(readerId, cfg, onCode){
+  if(cam){ stopCam(); if(camReaderId===readerId) return; }   // toggle: ปุ่มเดิม = ปิด, ปุ่มอื่น = สลับ
+  $(readerId).classList.remove('hidden');
+  // เปิด BarcodeDetector native ของเครื่อง (Android Chrome เร็ว/แม่นกว่า ZXing ; iOS ไม่มี → fallback ZXing เอง)
   const camCfg={verbose:false, experimentalFeatures:{useBarCodeDetectorIfSupported:true}};
-  if(window.Html5QrcodeSupportedFormats){
-    // [T-015] QR ก่อน (iOS+Android กล้องอ่านชัวร์) + Code128 (เผื่อยิงฉลากเก่า/Android)
-    camCfg.formatsToSupport=[Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128];
-  }
-  cam=new Html5Qrcode('reader', camCfg);
-  // [T-015] iPhone (iOS Safari ไม่มี BarcodeDetector → ตก ZXing) อ่าน QR ติด:
-  //   (1) ขอวิดีโอความละเอียดสูง (1920) + โฟกัสต่อเนื่อง → ภาพคม โฟกัส QR ระยะใกล้ได้
-  //   (2) qrbox เป็น "จัตุรัส" ตามรูปทรง QR (เดิมเป็นผืนผ้า 280×140 ไม่พอดี) + ปรับตามขนาดจอ
+  if(window.Html5QrcodeSupportedFormats){ camCfg.formatsToSupport=cfg.formats(); }
+  cam=new Html5Qrcode(readerId, camCfg);
+  camReaderId=readerId;
+  // [T-015] iPhone (iOS Safari ไม่มี BarcodeDetector → ตก ZXing) อ่านติด: วิดีโอ hi-res + โฟกัสต่อเนื่อง → ภาพคม
   // ⚠️ arg แรกของ cam.start() ต้องมี key เดียว (html5-qrcode บังคับ) — constraints ละเอียดวางใน config.videoConstraints
   const videoConstraints={ width:{ideal:1920}, height:{ideal:1080},
                            facingMode:{ideal:'environment'}, advanced:[{focusMode:'continuous'}] };
-  const qrboxFn=(vw,vh)=>{ const m=Math.floor(Math.min(vw,vh)*0.72); return {width:m,height:m}; };
-  cam.start({facingMode:'environment'},{fps:12,qrbox:qrboxFn,videoConstraints:videoConstraints},
-    txt=>{
-      // [T-013] สแกน→ใส่กล่อง→กดยืนยัน (ไม่ตัดทันที กันยิงผิดตัด)
-      const code=normalizeBarcode(txt);   // [T-015] ดึงเฉพาะตัวเลข กันขยะจากการสแกน
-      stopCam();
-      const input=$('issueInput');
-      input.value=code; input.focus();
-      toast(tf(APP_TEXT.issue.scannedTpl,{code}));
-    },
+  cam.start({facingMode:'environment'},{fps:12,qrbox:cfg.qrbox,videoConstraints:videoConstraints},
+    txt=>{ stopCam(); onCode(txt); },
     ()=>{}).catch(e=>toast(tf(APP_TEXT.cam.openFailTpl,{msg:e}),false));
 }
-function stopCam(){ if(cam){ cam.stop().then(()=>cam.clear()).catch(()=>{}); cam=null; } $('reader').classList.add('hidden'); }
+function stopCam(){
+  if(cam){ cam.stop().then(()=>cam.clear()).catch(()=>{}); cam=null; }
+  if(camReaderId){ $(camReaderId).classList.add('hidden'); camReaderId=null; }
+}
+
+// แท็บเบิกจ่าย: สแกน→ตัดเหลือเลข (ADR-0003)→ใส่กล่อง→กดยืนยัน (ไม่ตัดทันที กันยิงผิดตัด — T-013)
+function toggleCam(){
+  startCamScan('reader', SCAN_ISSUE, txt=>{
+    const code=normalizeBarcode(txt);   // [T-015] ดึงเฉพาะตัวเลข กันขยะจากการสแกน
+    const input=$('issueInput');
+    input.value=code; input.focus();
+    toast(tf(APP_TEXT.issue.scannedTpl,{code}));
+  });
+}
+// แท็บรับเข้า: สแกน barcode กล่องผู้ขาย→ใส่ค่า "ดิบ" (vendor อาจมีตัวอักษร)→ค้นหาชนิดอัตโนมัติทันที (ลดแรงเสียดทาน)
+function toggleCamRecv(){
+  startCamScan('readerRecv', SCAN_VENDOR, code=>{
+    $('recvVbcInput').value=code;
+    toast(tf(APP_TEXT.receive.scannedTpl,{code}));
+    scanVendorBarcode();
+  });
+}
 
 /* ===== รับเข้า ===== */
 let recvProducts=[];
