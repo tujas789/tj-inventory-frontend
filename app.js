@@ -116,6 +116,7 @@ function renderRecent(){
 /* ===== กล้องสแกน (ใช้ร่วมหลายแท็บ: เบิกจ่าย + รับเข้า) ===== */
 let cam=null;
 let camReaderId=null;   // จำว่าเปิดกล้องอยู่ที่ reader ตัวไหน (กดปุ่มเดิมซ้ำ = ปิด)
+let activeCamCfg=null;  // [T-043] cfg ของกล้องที่เปิดอยู่ — ไว้คืนสถานะปุ่มตอน stopCam
 // [T-042] config กล้องต่างกันต่อแท็บ (อย่ารวมเป็นค่าเดียว) — เหตุผล:
 //   · แท็บเบิก = ยิง "ฉลากเราเอง" (มี QR+Code128) บน iPhone ต้องพึ่ง QR → กรอบจัตุรัส (T-015/ADR-0003)
 //   · แท็บรับเข้า = ยิง "กล่องผู้ขาย" บาร์โค้ด 1D ทรงยาว (EAN/UPC/Code39/128) ไม่มี QR → กรอบแถบกว้าง
@@ -125,34 +126,54 @@ const SCAN_ISSUE = {
   formats: ()=>[Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128],
   // qrbox "จัตุรัส" ตามรูปทรง QR (เดิมผืนผ้า 280×140 ไม่พอดี) — ปรับตามขนาดจอ
   qrbox: (vw,vh)=>{ const m=Math.floor(Math.min(vw,vh)*0.72); return {width:m,height:m}; },
+  btn: 'camBtnIssue',                          // [T-043] ปุ่มที่เปิดกล้องนี้ — ไว้สลับ label ตอนเปิด/ปิด
+  labelOpen:  ()=>APP_TEXT.issue.camBtn,
+  labelClose: ()=>APP_TEXT.issue.camBtnClose,
 };
 const SCAN_VENDOR = {
   // กล่องผู้ขายหลากแบบ → รับ 1D ที่พบบ่อย + QR เผื่อไว้ (เจ้าของเคาะ 2026-06-14: ไม่แน่ใจฟอร์แมต)
   formats: ()=>{ const F=Html5QrcodeSupportedFormats; return [F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.QR_CODE]; },
   // qrbox "แถบนอน" ตามทรงบาร์โค้ด 1D — กว้าง 88% ของจอ × สูง ~42% ของความกว้าง (จูนต่อบนมือถือจริงได้)
   qrbox: (vw,vh)=>{ const w=Math.floor(vw*0.88); const h=Math.floor(Math.min(w*0.42, vh*0.6)); return {width:w,height:h}; },
+  btn: 'camBtnRecv',
+  labelOpen:  ()=>APP_TEXT.receive.camBtn,
+  labelClose: ()=>APP_TEXT.receive.camBtnClose,
 };
+
+// [T-043] สลับหน้าตาปุ่มกล้องตามสถานะ — เปิด = "✖ ปิดกล้อง" (+คลาส cam-active สีต่าง) / ปิด = label เดิม
+function setCamBtn(cfg, open){
+  const b=$(cfg.btn); if(!b) return;
+  b.textContent = open ? cfg.labelClose() : cfg.labelOpen();
+  b.classList.toggle('cam-active', open);
+}
 
 // เปิดกล้องที่ readerId ด้วย cfg (SCAN_ISSUE/SCAN_VENDOR); พบ barcode → onCode(rawText)
 //   ⚠️ ไม่ normalize ที่นี่ — ให้ callback จัดการเอง (เบิกตัดเหลือเลขตาม ADR-0003 / รับเข้าส่งค่าดิบกัน vendor มีตัวอักษร)
 function startCamScan(readerId, cfg, onCode){
-  if(cam){ stopCam(); if(camReaderId===readerId) return; }   // toggle: ปุ่มเดิม = ปิด, ปุ่มอื่น = สลับ
+  // [T-043] toggle ให้ถูก: ต้องจำ reader ที่เปิดอยู่ "ก่อน" stopCam() เพราะ stopCam เคลียร์ camReaderId=null ทันที
+  //   (บั๊กเดิม: เช็ค camReaderId หลัง stopCam → null เสมอ → กดปุ่มเดิมซ้ำกลายเป็นปิดแล้วเด้งเปิดใหม่)
+  const wasOpen = camReaderId;
+  if(cam){ stopCam(); }
+  if(wasOpen === readerId) return;             // กดปุ่มเดิม = แค่ปิด ไม่เปิดซ้ำ
   $(readerId).classList.remove('hidden');
   // เปิด BarcodeDetector native ของเครื่อง (Android Chrome เร็ว/แม่นกว่า ZXing ; iOS ไม่มี → fallback ZXing เอง)
   const camCfg={verbose:false, experimentalFeatures:{useBarCodeDetectorIfSupported:true}};
   if(window.Html5QrcodeSupportedFormats){ camCfg.formatsToSupport=cfg.formats(); }
   cam=new Html5Qrcode(readerId, camCfg);
   camReaderId=readerId;
+  activeCamCfg=cfg;
+  setCamBtn(cfg, true);                         // [T-043] ปุ่ม → "ปิดกล้อง"
   // [T-015] iPhone (iOS Safari ไม่มี BarcodeDetector → ตก ZXing) อ่านติด: วิดีโอ hi-res + โฟกัสต่อเนื่อง → ภาพคม
   // ⚠️ arg แรกของ cam.start() ต้องมี key เดียว (html5-qrcode บังคับ) — constraints ละเอียดวางใน config.videoConstraints
   const videoConstraints={ width:{ideal:1920}, height:{ideal:1080},
                            facingMode:{ideal:'environment'}, advanced:[{focusMode:'continuous'}] };
   cam.start({facingMode:'environment'},{fps:12,qrbox:cfg.qrbox,videoConstraints:videoConstraints},
     txt=>{ stopCam(); onCode(txt); },
-    ()=>{}).catch(e=>toast(tf(APP_TEXT.cam.openFailTpl,{msg:e}),false));
+    ()=>{}).catch(e=>{ stopCam(); toast(tf(APP_TEXT.cam.openFailTpl,{msg:e}),false); });  // [T-043] เปิดไม่ได้ → คืนสถานะปุ่ม/reader
 }
 function stopCam(){
   if(cam){ cam.stop().then(()=>cam.clear()).catch(()=>{}); cam=null; }
+  if(activeCamCfg){ setCamBtn(activeCamCfg, false); activeCamCfg=null; }   // [T-043] ปุ่มกลับเป็น label เดิม
   if(camReaderId){ $(camReaderId).classList.add('hidden'); camReaderId=null; }
 }
 

@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Thai+Looped:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css?v=20260614">
-<link rel="stylesheet" href="style.css?v=20260614">
+<link rel="stylesheet" href="style.css?v=20260614b">
 </head>
 <body>
 
@@ -62,7 +62,7 @@
              data-text-placeholder="issue.placeholder" placeholder="ยิง / พิมพ์ unit_barcode แล้ว Enter">
       <div class="row">
         <button class="green" id="issueBtn" onclick="doIssue()" data-text="issue.submitBtn">ตัดสต๊อก (Enter)</button>
-        <button class="ghost" onclick="toggleCam()" data-text="issue.camBtn">📷 ใช้กล้อง</button>
+        <button class="ghost" id="camBtnIssue" onclick="toggleCam()" data-text="issue.camBtn">📷 ใช้กล้อง</button>
       </div>
       <div id="reader" class="hidden"></div>
     </div>
@@ -81,7 +81,7 @@
       <div class="scanbox">
         <label data-text="receive.vbcLabel">ยิง barcode กล่อง (ค้นหาชนิดอัตโนมัติ)</label>
         <input id="recvVbcInput" autocomplete="off" data-text-placeholder="receive.vbcPlaceholder" placeholder="ยิง / พิมพ์ barcode กล่อง แล้ว Enter">
-        <button class="ghost" style="margin-top:8px" onclick="toggleCamRecv()" data-text="receive.camBtn">📷 ใช้กล้องมือถือ</button>
+        <button class="ghost" id="camBtnRecv" style="margin-top:8px" onclick="toggleCamRecv()" data-text="receive.camBtn">📷 ใช้กล้องมือถือ</button>
         <div id="readerRecv" class="hidden"></div>
       </div>
       <label data-text="receive.pickLabel">หรือเลือกจากรายการ</label>
@@ -160,9 +160,9 @@
 <div id="printArea"></div>
 
 <!-- T-030: JS แตกเป็นไฟล์ — ลำดับสำคัญ (app-text -> api -> app) และต้องอยู่ท้าย body (มี addEventListener นอก DOMContentLoaded) -->
-<script src="app-text.js?v=20260614"></script>
+<script src="app-text.js?v=20260614b"></script>
 <script src="api.js?v=20260613"></script>
 <script src="labels.js?v=20260613"></script>
-<script src="app.js?v=20260614"></script>
+<script src="app.js?v=20260614b"></script>
 </body>
 </html>
