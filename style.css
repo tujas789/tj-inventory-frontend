@@ -64,13 +64,16 @@
           font-family:var(--sans); box-shadow:3px 3px 0 var(--ink);
           background:linear-gradient(135deg,var(--coral) 0%,var(--orange) 55%,var(--sun) 100%);
           transition:filter .12s, transform .08s, box-shadow .08s; }
-  button:hover{ filter:brightness(1.05); }
   button:active{ filter:brightness(.95); transform:translate(3px,3px); box-shadow:none; }
   button.ghost{ background:var(--card); color:var(--ink); border:1.5px solid var(--ink); }
-  button.ghost:hover{ filter:none; background:var(--ink); color:var(--bg); }
   /* [T-043] ปุ่มกล้องตอนเปิดอยู่ — สีแดง danger ให้รู้ว่ากดเพื่อ "ปิด" */
   button.ghost.cam-active{ border-color:var(--dan); color:var(--dan); background:rgba(198,69,69,.10); }
-  button.ghost.cam-active:hover{ background:var(--dan); color:var(--bg); }
+  /* [T-044] hover เฉพาะเครื่องที่ hover ได้จริง (เมาส์) — กันมือถือแตะแล้ว :hover ค้าง (ปุ่ม ghost ค้างสีดำหลังกดปิดกล้อง) */
+  @media (hover: hover){
+    button:hover{ filter:brightness(1.05); }
+    button.ghost:hover{ filter:none; background:var(--ink); color:var(--bg); }
+    button.ghost.cam-active:hover{ background:var(--dan); color:var(--bg); }
+  }
   button.sm{ width:auto; padding:9px 14px; font-size:13px; margin:0; box-shadow:2px 2px 0 var(--ink); }
   button.sm:active{ transform:translate(2px,2px); box-shadow:none; }
   button:disabled{ opacity:.45; cursor:default; filter:none; }
