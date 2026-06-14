@@ -18,6 +18,7 @@
   --ci-sun:#ffa110;
   --ci-green:#5db872;
   --ci-danger:#c64545;
+  --ci-warn:#d98a2b;       /* amber "ใกล้หมดอายุ" — แยกจาก coral accent (T-040) */
 
   /* ─── fonts (ใช้ร่วมทั้งแอป) ─── */
   --serif:'Cormorant Garamond','Sukhumvit Set','Noto Sans Thai Looped',Garamond,serif;
@@ -32,6 +33,7 @@
   --coral:var(--ci-primary); --coral2:var(--ci-primary-2);
   --orange:var(--ci-orange); --sun:var(--ci-sun);
   --green:var(--ci-green); --dan:var(--ci-danger);
+  --warn:var(--ci-warn);   /* amber "ใกล้หมดอายุ" (T-040) */
   --screen:#e7f3ea; --screenink:#2f7a45;
   --gold:var(--ci-primary); --gold2:var(--ci-primary-2);
   --r-btn:8px; --r-card:12px;
@@ -45,5 +47,5 @@
   --red-bg:rgba(198,69,69,0.12);     --red-ink:var(--ci-danger);
   --blue-bg:rgba(93,184,166,0.16);   --blue-ink:#3f8f7e;   /* teal สำหรับ "เบิก" */
   --green-bg:rgba(93,184,114,0.16);  --green-ink:#2f7a45;
-  --yellow-bg:rgba(204,120,92,0.16); --yellow-ink:var(--ci-primary-2); /* coral tint "ใกล้หมด" */
+  --yellow-bg:rgba(217,138,43,0.16); --yellow-ink:var(--ci-warn); /* amber "ใกล้หมด" (T-040) */
 }
