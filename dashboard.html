@@ -670,8 +670,12 @@ function renderStockTable(rows) {
       `<div class="empty-state"><i>📭</i>ยังไม่มีสต๊อกในระบบ</div>`;
     return;
   }
-  const tbody = rows.map((r, i) => `
-    <tr onclick="toggleLots('${r.product_id}', ${i})" data-name="${(r.name||'').toLowerCase()}" style="--index:${i}">
+  const tbody = rows.map((r, i) => {
+    // [T-045] sanitize pid เหลือ [\w-] ก่อนใส่ onclick/id (HTML-escape ไม่พอใน JS context —
+    // browser ถอด entity ก่อน parse JS) · data-name = attribute → esc() (&quot;) พอ · pattern เดียวกับ T-020
+    const sid = String(r.product_id == null ? '' : r.product_id).replace(/[^\w-]/g, '');
+    return `
+    <tr onclick="toggleLots('${sid}', ${i})" data-name="${esc((r.name||'').toLowerCase())}" style="--index:${i}">
       <td>
         <div class="product-name">${esc(r.name)}</div>
         <div class="product-id">${esc(r.product_id)}</div>
@@ -682,14 +686,15 @@ function renderStockTable(rows) {
         <span class="qty-unit">ชิ้น</span>
       </td>
     </tr>
-    <tr class="lot-expand-row hidden" id="lot-row-${r.product_id}">
+    <tr class="lot-expand-row hidden" id="lot-row-${sid}">
       <td colspan="3">
-        <div class="lot-expand-inner" id="lot-inner-${r.product_id}">
+        <div class="lot-expand-inner" id="lot-inner-${sid}">
           <div class="empty-state" style="padding:12px 0; font-size:11px;">กำลังโหลดรายล็อต...</div>
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   document.getElementById('stockTableWrap').innerHTML = `
     <table class="stock-table">
@@ -862,9 +867,11 @@ function renderTransactions(list) {
 /* ──────────────────────────────
    HELPERS
    ────────────────────────────── */
+// [T-045] escape ครบ 5 ตัว (& < > " ') ให้ตรงกับ api.js — กัน attribute injection/XSS
+// เดิม escape แค่ &<> → ค่าที่ฉีดเข้า attribute (data-name/onclick/id) ที่มี " หรือ ' แหก attribute ได้
 function esc(s) {
   return String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    .replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function daysLeft(dateStr) {
   if (!dateStr) return null;
