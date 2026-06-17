@@ -769,9 +769,11 @@ function filterStockTable() {
     const nm = tr.getAttribute('data-name') || '';
     const hide = q !== '' && !nm.includes(q);
     tr.classList.toggle('hidden', hide);
-    // also hide the lot expand row below
+    // [T-054] lot drawer ใต้แถวสินค้าเป็น "คลิกเพื่อกาง" (default ซ่อน) — ตอน filter/ค้นหา
+    // ยุบ drawer ทุกแถวเสมอ (ไม่ใช่แค่แถวที่ถูกกรองออก) ให้ลิสต์สะอาด ผู้ใช้คลิกกางใหม่ได้
+    // เดิมเขียน toggle('hidden', hide||true) = true เสมอ อ่านงงเหมือน typo — ใช้ add ให้เจตนาชัด
     const next = tr.nextElementSibling;
-    if (next && next.classList.contains('lot-expand-row')) next.classList.toggle('hidden', hide || true);
+    if (next && next.classList.contains('lot-expand-row')) next.classList.add('hidden');
   });
 }
 
