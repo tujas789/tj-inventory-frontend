@@ -733,11 +733,11 @@ function toggleLots(pid, rowIdx) {
 
   apiGet('stockByLot', { product_id: pid })
     .then(res => {
-      if (!res || !res.ok) { lotInner.innerHTML = `<div class="empty-state" style="padding:8px 0;font-size:11px;color:var(--red-ink);">โหลดไม่ได้: ${res?.error||''}</div>`; return; }
+      if (!res || !res.ok) { lotInner.innerHTML = `<div class="empty-state" style="padding:8px 0;font-size:11px;color:var(--red-ink);">โหลดไม่ได้: ${esc(res?.error||'')}</div>`; return; }
       lotCache[pid] = res.lots || [];
       renderLotInner(lotInner, lotCache[pid]);
     })
-    .catch(e => { lotInner.innerHTML = `<div class="empty-state" style="padding:8px 0;font-size:11px;">ผิดพลาด: ${e.message}</div>`; });
+    .catch(e => { lotInner.innerHTML = `<div class="empty-state" style="padding:8px 0;font-size:11px;">ผิดพลาด: ${esc(e.message)}</div>`; });
 }
 
 function renderLotInner(el, lots) {
@@ -753,7 +753,7 @@ function renderLotInner(el, lots) {
     return `<div class="lot-line">
       <div class="lot-line-left">
         <span class="lot-no-txt">${esc(l.lot_no || l.lot_id)}</span>
-        <span class="lot-exp">หมดอายุ ${l.expiry_date || '—'}</span>
+        <span class="lot-exp">หมดอายุ ${esc(l.expiry_date || '—')}</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span class="lot-qty">${l.in_stock} ชิ้น</span>
