@@ -114,6 +114,9 @@ function buildLabelDoc(items){
 function printLabelItems(items){
   if(!items||!items.length){ toast(APP_TEXT.print.noLabels,false); return; }
   if(typeof JsBarcode==='undefined'){ toast(APP_TEXT.print.libMissing,false); return; }
+  // [review] ถ้า lib QR โหลดไม่สำเร็จ → ฉลากจะออกแบบ Code128-only เงียบๆ → block + เตือนชัด
+  // (มือถือ iOS/Android เน็ตช้า lib อาจไม่ทันโหลด — ห้ามพิมพ์ฉลากขาด QR ปนของจริง)
+  if(typeof qrcode==='undefined'){ toast(APP_TEXT.print.qrMissing,false); return; }
   // ── พิมพ์ผ่าน hidden iframe แล้วสั่ง frame.contentWindow.print() ────────────
   // สั่ง print() บน iframe ที่เราคุมเอง → @page ของ iframe ถูกใช้จริง (ไม่หมุน 90°)
   const doc = buildLabelDoc(items);

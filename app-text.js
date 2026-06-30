@@ -106,6 +106,7 @@ const APP_TEXT = {
   print: {
     noLabels:   'ไม่มีฉลากให้พิมพ์',
     libMissing: 'โหลดตัวสร้าง barcode ไม่ได้ (เช็กเน็ต)',
+    qrMissing:  'โหลดตัว QR ไม่ได้ (เช็กเน็ต) — ยังไม่พิมพ์ เพราะฉลากจะขาด QR',
     failTpl:    'พิมพ์ไม่สำเร็จ: {msg}',
   },
   // [T-033] หน้าประวัติการปริ้น (print-history.html — ใช้ APP_TEXT ร่วมกัน)

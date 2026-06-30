@@ -855,7 +855,7 @@ function renderTransactions(list) {
         <div class="txn-body">
           <div class="txn-product">${esc(t.product_name || '—')}</div>
           <div class="txn-detail">
-            ${labels[t.type] || t.type}
+            ${labels[t.type] || esc(t.type)}
             ${t.unit_barcode ? `· <span style="font-family:var(--font-mono);font-size:10px;">${esc(t.unit_barcode)}</span>` : ''}
             · ${esc(t.user || '—')}
           </div>
