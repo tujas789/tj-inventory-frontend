@@ -4,7 +4,10 @@ const $ = id => document.getElementById(id);
 // [T-020] escape ทุกค่าจากผู้ใช้/ชีตก่อนฉีดเข้า innerHTML (ชื่อสินค้า/ล็อต = input คน → กัน XSS)
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let CURRENT = null;
-const recent = [];
+// [review I2] ประวัติเบิกของเซสชัน — เก็บ sessionStorage กันหายตอน refresh มือถือ (เกิดบ่อย)
+//   sessionStorage ไม่ใช่ localStorage: ปิดแท็บ = ล้าง (เป็นแค่ประวัติชั่วคราว ไม่ใช่ log จริง — log จริงอยู่ Transaction)
+const recent = (function(){ try{ return JSON.parse(sessionStorage.getItem('tj_recent'))||[]; }catch(e){ return []; } })();
+function saveRecent(){ try{ sessionStorage.setItem('tj_recent', JSON.stringify(recent.slice(0,10))); }catch(e){} }
 let busy = false;
 
 /* ============================================================
@@ -23,16 +26,19 @@ const IS_DEMO = /[?&]demo(=|&|$)/.test(location.search) || /PASTE_EXEC_URL/.test
 // GET = อ่าน (action + params ผ่าน query) | POST = เขียน (JSON body)
 // ★ ไม่ตั้ง Content-Type เอง → body กลายเป็น text/plain → เป็น "simple request" → ไม่มี CORS preflight
 //   (เคล็ดลับนี้คือกุญแจให้ fetch คุย Apps Script ได้โดยไม่ติด CORS — ดู BactBud)
+// [review C2] server ตอบไม่ใช่ 2xx (500/502 = หน้า HTML error) → r.json() throw message งงๆ
+//   เช็ค r.ok ก่อน → error บอกชัดว่า server พัง ไม่ใช่ข้อมูลพัง
+const _httpOk = r => { if(!r.ok) throw new Error('เซิร์ฟเวอร์ขัดข้อง (HTTP '+r.status+')'); return r.json(); };
 function apiGet(action, params){
   if(IS_DEMO) return DEMO.call(action, params||{});
   const q=new URLSearchParams(Object.assign({action}, params||{}));
-  return fetch(API_URL+'?'+q.toString()).then(r=>r.json());
+  return fetch(API_URL+'?'+q.toString()).then(_httpOk);
 }
 function apiPost(payload){
   if(IS_DEMO) return DEMO.call(payload.action, payload);
   // [T-014] แนบ session token อัตโนมัติ + token ตาย (auth:false) → เด้งกลับหน้า login จุดเดียว
   if(CURRENT && CURRENT.token && !payload.token) payload.token = CURRENT.token;
-  return fetch(API_URL, {method:'POST', body:JSON.stringify(payload)}).then(r=>r.json())
+  return fetch(API_URL, {method:'POST', body:JSON.stringify(payload)}).then(_httpOk)
     .then(res=>{ if(res && res.auth===false) forceRelogin(); return res; });
 }
 

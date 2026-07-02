@@ -59,6 +59,7 @@ function doLogout(){
 function enterApp(){
   $('whoName').textContent=CURRENT.display_name;
   $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+  renderRecent();   // [review I2] วาดประวัติที่กู้จาก sessionStorage (กัน refresh มือถือแล้วลิสต์ว่าง)
   showTab('issue');
 }
 
@@ -101,14 +102,16 @@ function doIssue(code){
       busy=false; $('issueBtn').disabled=false;
       if(!res||!res.ok){ toast(tf(APP_TEXT.issue.failTpl,{msg:(res&&res.error)||APP_TEXT.issue.failed}),false); input.select(); return; }
       toast(tf(APP_TEXT.issue.okTpl,{name:res.product_name||res.unit_barcode}));
-      recent.unshift(res); renderRecent(); input.value=''; input.focus();
+      recent.unshift(Object.assign({at:Date.now()},res)); saveRecent();   // [review I2] จำเวลา + persist กัน refresh
+      renderRecent(); input.value=''; input.focus();
     })
     .catch(e=>{ busy=false; $('issueBtn').disabled=false; toast(tf(APP_TEXT.issue.failTpl,{msg:tf(APP_TEXT.common.errorTpl,{msg:e.message})}),false); input.select(); });
 }
 function renderRecent(){
   if(!recent.length){ $('recent').innerHTML=`<div class="empty">${APP_TEXT.recent.empty}</div>`; return; }
   $('recent').innerHTML=recent.slice(0,10).map(r=>{
-    const tm=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    // [review I2] ใช้เวลาที่เบิกจริง (r.at) — เดิมใช้เวลาตอน render ทุกแถวเลยโชว์เวลาเดียวกันหมด
+    const tm=new Date(r.at||Date.now()).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
     return `<div class="item"><div class="top"><div><div class="name">${esc(r.product_name||r.unit_barcode)}</div><div class="meta">${esc(r.unit_barcode)} • ${APP_TEXT.recent.lotPrefix} ${esc(r.lot_no||'-')}</div></div><div class="muted">${tm}</div></div></div>`;
   }).join('');
 }
@@ -167,9 +170,14 @@ function startCamScan(readerId, cfg, onCode){
   // ⚠️ arg แรกของ cam.start() ต้องมี key เดียว (html5-qrcode บังคับ) — constraints ละเอียดวางใน config.videoConstraints
   const videoConstraints={ width:{ideal:1920}, height:{ideal:1080},
                            facingMode:{ideal:'environment'}, advanced:[{focusMode:'continuous'}] };
-  cam.start({facingMode:'environment'},{fps:12,qrbox:cfg.qrbox,videoConstraints:videoConstraints},
+  // [review I5] บาง device cam.start() ค้าง (ไม่ resolve/reject) → ปุ่มค้างสถานะ "ปิดกล้อง" ตลอด
+  //   Promise.race กับ timeout 15 วิ → เด้ง error + คืนสถานะปุ่ม (ถ้ากล้องมาทันก่อน timeout = ไม่กระทบ)
+  const startP = cam.start({facingMode:'environment'},{fps:12,qrbox:cfg.qrbox,videoConstraints:videoConstraints},
     txt=>{ stopCam(); onCode(txt); },
-    ()=>{}).catch(e=>{ stopCam(); toast(tf(APP_TEXT.cam.openFailTpl,{msg:e}),false); });  // [T-043] เปิดไม่ได้ → คืนสถานะปุ่ม/reader
+    ()=>{});
+  const timeoutP = new Promise((_,rej)=>setTimeout(()=>rej(new Error('เปิดกล้องไม่สำเร็จใน 15 วินาที — ลองใหม่หรือตรวจสิทธิ์กล้อง')),15000));
+  Promise.race([startP, timeoutP])
+    .catch(e=>{ stopCam(); toast(tf(APP_TEXT.cam.openFailTpl,{msg:e}),false); });  // [T-043] เปิดไม่ได้ → คืนสถานะปุ่ม/reader
 }
 function stopCam(){
   if(cam){ cam.stop().then(()=>cam.clear()).catch(()=>{}); cam=null; }
@@ -272,11 +280,16 @@ function toggleNewProduct(){
   renderLabelSample();   // [T-033] ชื่อบนตัวอย่างเปลี่ยนแหล่ง (dropdown ↔ ช่องชื่อใหม่)
 }
 
+// [review C3] เพดานรับเข้าต่อครั้ง — กัน qty หลุดนิ้ว (999999) ยิงไป server สร้าง barcode มหาศาลจนชน quota
+//   ต้องตรงกับ RECV_QTY_MAX ฝั่ง backend (01_receive.gs) — backend คือด่านจริง ตรงนี้แค่ feedback เร็ว
+const RECV_QTY_MAX = 500;
 function doReceive(){
+  if(busy) return;   // [review C1] กันเรียกซ้ำระหว่างรอ server (ปุ่ม disabled กันคลิกอยู่แล้ว — ชั้นนี้เผื่อทางเรียกอื่นในอนาคต)
   const expiry=$('recvExpiry').value.trim();
   const qty=Number($('recvQty').value);
   if(!expiry){ toast(APP_TEXT.receive.needExpiry,false); $('recvExpiry').focus(); return; }
   if(!qty||qty<1){ toast(APP_TEXT.receive.needQty,false); $('recvQty').focus(); return; }
+  if(qty>RECV_QTY_MAX){ toast(tf(APP_TEXT.receive.qtyMaxTpl,{max:RECV_QTY_MAX}),false); $('recvQty').focus(); return; }
 
   const payload={lot_no:$('recvLotNo').value.trim(), expiry_date:expiry, qty, user:CURRENT.user_id};
 
@@ -292,10 +305,10 @@ function doReceive(){
     payload.product_id=pid;
   }
 
-  $('recvBtn').disabled=true;
+  busy=true; $('recvBtn').disabled=true;
   apiPost(Object.assign({action:'receiveForUI'}, payload))
     .then(res=>{
-      $('recvBtn').disabled=false;
+      busy=false; $('recvBtn').disabled=false;
       if(!res||!res.ok){ toast(res.error||APP_TEXT.receive.failed,false); return; }
       toast(tf(APP_TEXT.receive.okTpl,{n:res.unit_barcodes.length}));
       // เก็บข้อมูลฉลากฝั่ง client (ชื่อ/วันหมดอายุ/วันที่รับ/unit_barcode) — ครบไม่ต้องถาม server ซ้ำ
@@ -310,7 +323,7 @@ function doReceive(){
       };
       renderReceiveResult(res);
     })
-    .catch(e=>{ $('recvBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
+    .catch(e=>{ busy=false; $('recvBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
 }
 
 function renderReceiveResult(res){
