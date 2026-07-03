@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TJ Inventory — Dashboard</title>
+  <meta name="theme-color" content="#faf9f5">
+  <link rel="icon" href="favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Thai+Looped:wght@400;500;600&display=swap" rel="stylesheet">
@@ -418,7 +420,7 @@
   <div class="topbar-right">
     <span class="last-updated" id="lastUpdated">—</span>
     <a class="topbar-app-link" href="index.html">
-      <span style="vertical-align:-2px; margin-right:4px;">📤</span>เปิดหน้าเบิก/รับเข้า
+      <span style="vertical-align:-2px; margin-right:4px;">🫗</span>เปิดหน้าเบิก/รับเข้า
     </a>
   </div>
 </header>
@@ -439,7 +441,7 @@
     <!-- Total in stock -->
     <div class="kpi-card">
       <div class="kpi-label">
-        <span style="font-size:13px;">📦</span>
+        <span style="font-size:13px;">🫙</span>
         สต๊อกรวมทั้งหมด
       </div>
       <div class="kpi-value" id="kpiTotal">—</div>
@@ -459,7 +461,7 @@
     <!-- Expiring soon -->
     <div class="kpi-card">
       <div class="kpi-label">
-        <span style="font-size:13px;">⚠️</span>
+        <span style="font-size:13px;">⏳</span>
         ใกล้หมดอายุ
       </div>
       <div class="kpi-value" id="kpiWarn">—</div>
@@ -838,9 +840,9 @@ function renderTransactions(list) {
     return;
   }
   const icons = {
-    receive: { cls: 'receive', icon: '📥' },
-    issue:   { cls: 'issue',   icon: '📤' },
-    count:   { cls: 'count',   icon: '📋' },
+    receive: { cls: 'receive', icon: '🧺' },
+    issue:   { cls: 'issue',   icon: '🫗' },
+    count:   { cls: 'count',   icon: '🏷️' },
   };
   const labels = { receive: 'รับเข้า', issue: 'เบิกจ่าย', count: 'เช็คสต๊อก' };
 

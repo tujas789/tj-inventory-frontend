@@ -5,6 +5,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>TJ Inventory</title>
+<!-- PWA + favicon (T-045): เปิดจากหน้าโฮมมือถือแบบ standalone + แถบ browser กลืนพื้นครีม -->
+<meta name="theme-color" content="#faf9f5">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TJ Inventory">
 <!-- สแกน barcode ด้วยกล้องมือถือ (Q4: รองรับทั้ง Chrome/Android + Safari/iOS) -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
 <!-- generate Code128 barcode สำหรับพิมพ์ฉลาก (T-008) -->
@@ -16,14 +24,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Thai+Looped:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css?v=20260614">
-<link rel="stylesheet" href="style.css?v=20260614c">
+<link rel="stylesheet" href="style.css?v=20260703b">
 </head>
 <body>
 
 <!-- ===================== Login ===================== -->
 <div id="login">
   <div class="box">
-    <h1 data-text="app.brand">🧴 TJ Inventory</h1>
+    <h1 data-text="app.brand">🫧 TJ Inventory</h1>
     <div class="sub" data-text="login.subtitle">เลือกชื่อ แล้วใส่ PIN เพื่อเข้าใช้งาน</div>
     <div class="card">
       <label data-text="login.userLabel">ชื่อผู้ใช้</label>
@@ -39,7 +47,7 @@
 <!-- ===================== App (หลัง login) ===================== -->
 <div id="app" class="hidden">
   <header>
-    <h1 data-text="app.brand">🧴 TJ Inventory</h1>
+    <h1 data-text="app.brand">🫧 TJ Inventory</h1>
     <div class="who">
       <span>👤 <b id="whoName">-</b></span>
       <button class="ghost sm" onclick="doLogout()" data-text="header.logout">ออก</button>
@@ -48,21 +56,21 @@
 
   <!-- Tab bar [T-025] role=tablist + aria-selected -->
   <div class="tabbar" role="tablist" aria-label="เมนูหลัก">
-    <button id="tab-btn-issue"   class="tab-btn active" role="tab" aria-selected="true"  aria-controls="tab-issue"   onclick="showTab('issue')"   data-text="tabs.issue">📤 เบิก</button>
-    <button id="tab-btn-receive" class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-receive" onclick="showTab('receive')" data-text="tabs.receive">📥 รับเข้า</button>
-    <button id="tab-btn-stock"   class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-stock"   onclick="showTab('stock')"   data-text="tabs.stock">📊 สต๊อก</button>
-    <button id="tab-btn-expiry"  class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-expiry"  onclick="showTab('expiry')"  data-text="tabs.expiry">⏰ หมดอายุ</button>
+    <button id="tab-btn-issue"   class="tab-btn active" role="tab" aria-selected="true"  aria-controls="tab-issue"   onclick="showTab('issue')"   data-text="tabs.issue">🫗 เบิก</button>
+    <button id="tab-btn-receive" class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-receive" onclick="showTab('receive')" data-text="tabs.receive">🧺 รับเข้า</button>
+    <button id="tab-btn-stock"   class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-stock"   onclick="showTab('stock')"   data-text="tabs.stock">🫙 สต๊อก</button>
+    <button id="tab-btn-expiry"  class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-expiry"  onclick="showTab('expiry')"  data-text="tabs.expiry">⏳ หมดอายุ</button>
   </div>
 
   <!-- ===== Tab: เบิกจ่าย ===== -->
   <section id="tab-issue" class="wrap" role="tabpanel" aria-labelledby="tab-btn-issue">
     <div class="card scanbox">
-      <h2 data-text="issue.title">📤 เบิกจ่าย — ยิง barcode ตัดสต๊อกทันที</h2>
+      <h2 data-text="issue.title">🫗 เบิกจ่าย — ยิง barcode ตัดสต๊อกทันที</h2>
       <input id="issueInput" autocomplete="off"
              data-text-placeholder="issue.placeholder" placeholder="ยิง / พิมพ์ unit_barcode แล้ว Enter">
       <div class="row">
         <button class="green" id="issueBtn" onclick="doIssue()" data-text="issue.submitBtn">ตัดสต๊อก (Enter)</button>
-        <button class="ghost" id="camBtnIssue" onclick="toggleCam()" data-text="issue.camBtn">📷 ใช้กล้อง</button>
+        <button class="ghost" id="camBtnIssue" onclick="toggleCam()" data-text="issue.camBtn">📸 ใช้กล้อง</button>
       </div>
       <div id="reader" class="hidden"></div>
     </div>
@@ -77,18 +85,18 @@
 
     <!-- Card 1: เลือกชนิด -->
     <div class="card">
-      <h2 data-text="receive.productTitle">📦 เลือกชนิดน้ำยา</h2>
+      <h2 data-text="receive.productTitle">🧴 เลือกชนิดน้ำยา</h2>
       <div class="scanbox">
         <label data-text="receive.vbcLabel">ยิง barcode กล่อง (ค้นหาชนิดอัตโนมัติ)</label>
         <input id="recvVbcInput" autocomplete="off" data-text-placeholder="receive.vbcPlaceholder" placeholder="ยิง / พิมพ์ barcode กล่อง แล้ว Enter">
-        <button class="ghost" id="camBtnRecv" style="margin-top:8px" onclick="toggleCamRecv()" data-text="receive.camBtn">📷 ใช้กล้องมือถือ</button>
+        <button class="ghost mt8" id="camBtnRecv" onclick="toggleCamRecv()" data-text="receive.camBtn">📸 ใช้กล้องมือถือ</button>
         <div id="readerRecv" class="hidden"></div>
       </div>
       <label data-text="receive.pickLabel">หรือเลือกจากรายการ</label>
       <select id="recvProductSel">
         <option value="" data-text="receive.loadingProducts">— กำลังโหลด... —</option>
       </select>
-      <button class="ghost" style="margin-top:10px" onclick="toggleNewProduct()" data-text="receive.newProductBtn">➕ สร้างชนิดใหม่</button>
+      <button class="ghost mt10" onclick="toggleNewProduct()" data-text="receive.newProductBtn">➕ สร้างชนิดใหม่</button>
 
       <!-- ฟอร์มชนิดใหม่ (hidden จนกว่าจะกด) -->
       <div id="newProductForm" class="hidden">
@@ -105,7 +113,7 @@
 
     <!-- Card 2: รายละเอียดล็อต -->
     <div class="card">
-      <h2 data-text="receive.lotTitle">📋 รายละเอียดล็อต</h2>
+      <h2 data-text="receive.lotTitle">🏷️ รายละเอียดล็อต</h2>
       <label data-text="receive.lotNoLabel">เลขล็อต (ข้างกล่อง) — ถ้ามี</label>
       <input id="recvLotNo" autocomplete="off" data-text-placeholder="receive.lotNoPlaceholder" placeholder="เช่น LOT-2026-A">
       <label data-text="receive.expiryLabel">วันหมดอายุ *</label>
@@ -115,7 +123,7 @@
       <!-- [T-033] ตัวอย่างฉลากสด — render จากเทมเพลตเดียวกับพิมพ์จริง (labels.js) -->
       <label data-text="receive.sampleLabel">ตัวอย่างฉลาก (อัปเดตตามที่กรอก)</label>
       <div id="labelSample"></div>
-      <button id="recvBtn" class="green" onclick="doReceive()" data-text="receive.submitBtn">📥 รับเข้า</button>
+      <button id="recvBtn" class="green" onclick="doReceive()" data-text="receive.submitBtn">🧺 รับเข้า</button>
     </div>
 
     <!-- Card 3: ผลลัพธ์ (hidden จนกว่าสำเร็จ) -->
@@ -123,12 +131,12 @@
       <h2 data-text="receive.resultTitle">✅ รับเข้าสำเร็จ</h2>
       <div id="recvResultBody"></div>
       <button class="green" id="printBtn" onclick="printLabels()" data-text="receive.printBtn">🖨️ พิมพ์ฉลาก</button>
-      <button class="ghost" onclick="resetReceive()" style="margin-top:8px" data-text="receive.nextBtn">🔄 รับเข้าชุดถัดไป</button>
+      <button class="ghost mt8" onclick="resetReceive()" data-text="receive.nextBtn">🔄 รับเข้าชุดถัดไป</button>
     </div>
 
     <!-- [T-033] ทางเข้าหน้าประวัติการปริ้น (html แยก — ปริ้นซ้ำได้ ไม่ต้อง login) -->
-    <div style="text-align:center;margin-top:4px">
-      <a href="print-history.html" target="_blank" class="muted" style="font-size:13px" data-text="receive.historyLink">🕘 ประวัติการปริ้น ↗</a>
+    <div class="footnote">
+      <a href="print-history.html" target="_blank" class="muted" data-text="receive.historyLink">🕘 ประวัติการปริ้น ↗</a>
     </div>
 
   </section>
@@ -137,9 +145,9 @@
   <section id="tab-stock" class="wrap hidden" role="tabpanel" aria-labelledby="tab-btn-stock">
     <div class="card">
       <!-- title หุ้ม span เพราะ data-text เซ็ต textContent — ใส่บน h2 ตรงๆ จะลบปุ่มรีเฟรชข้างใน -->
-      <h2><span data-text="stock.title">📊 สต๊อกคงเหลือ</span> <button class="ghost sm" style="margin-left:auto" onclick="initStockTab()" data-text="stock.refreshBtn">🔄 รีเฟรช</button></h2>
+      <h2><span data-text="stock.title">🫙 สต๊อกคงเหลือ</span> <button class="ghost sm push-r" onclick="initStockTab()" data-text="stock.refreshBtn">🔄 รีเฟรช</button></h2>
       <input id="stockSearch" autocomplete="off" data-text-placeholder="stock.searchPlaceholder" placeholder="🔍 ค้นหาชนิดน้ำยา..." oninput="filterStock()">
-      <div id="stockSummary" class="muted" style="margin:10px 0" data-text="common.loading">กำลังโหลด...</div>
+      <div id="stockSummary" class="muted summary" data-text="common.loading">กำลังโหลด...</div>
       <div id="stockList"></div>
     </div>
   </section>
@@ -147,8 +155,8 @@
   <!-- ===== Tab: ใกล้หมดอายุ (FEFO — T-009) ===== -->
   <section id="tab-expiry" class="wrap hidden" role="tabpanel" aria-labelledby="tab-btn-expiry">
     <div class="card">
-      <h2><span data-text="expiry.title">⏰ ล็อตใกล้หมดอายุ</span> <button class="ghost sm" style="margin-left:auto" onclick="initExpiryTab()" data-text="expiry.refreshBtn">🔄 รีเฟรช</button></h2>
-      <div id="expirySummary" class="muted" style="margin-bottom:10px" data-text="common.loading">กำลังโหลด...</div>
+      <h2><span data-text="expiry.title">⏳ ล็อตใกล้หมดอายุ</span> <button class="ghost sm push-r" onclick="initExpiryTab()" data-text="expiry.refreshBtn">🔄 รีเฟรช</button></h2>
+      <div id="expirySummary" class="muted summary" data-text="common.loading">กำลังโหลด...</div>
       <div id="expiryList"></div>
     </div>
   </section>
@@ -160,7 +168,7 @@
 <div id="printArea"></div>
 
 <!-- T-030: JS แตกเป็นไฟล์ — ลำดับสำคัญ (app-text -> api -> app) และต้องอยู่ท้าย body (มี addEventListener นอก DOMContentLoaded) -->
-<script src="app-text.js?v=20260702"></script>
+<script src="app-text.js?v=20260703"></script>
 <script src="api.js?v=20260702"></script>
 <script src="labels.js?v=20260613"></script>
 <script src="app.js?v=20260702"></script>
