@@ -14,7 +14,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="TJ Inventory">
 <!-- สแกน barcode ด้วยกล้องมือถือ (Q4: รองรับทั้ง Chrome/Android + Safari/iOS) -->
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
+<!-- self-host แทน unpkg — CDN ล่ม/โดนบล็อก = สแกนไม่ได้ทั้งระบบ; lib หยุด maintain ที่ 2.3.8 จึงไม่มีอัปเดตให้ตามจาก CDN -->
+<script src="html5-qrcode.min.js"></script>
 <!-- generate Code128 barcode สำหรับพิมพ์ฉลาก (T-008) -->
 <script src="https://unpkg.com/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" integrity="sha384-Kk5SjBOKprEnGfyBWfD2zROFd1Cu8kwOXxG2GIhYPcoDL2rBJS9P8Ud1ZMy4412a" crossorigin="anonymous"></script>
 <!-- generate QR code สำหรับกล้องมือถือ iOS+Android (T-015) — เล็ก, sync, ออก SVG คมเหมาะ thermal -->
@@ -73,6 +74,8 @@
         <button class="ghost" id="camBtnIssue" onclick="toggleCam()" data-text="issue.camBtn">📸 ใช้กล้อง</button>
       </div>
       <div id="reader" class="hidden"></div>
+      <!-- [T-062] ไฟฉาย — โชว์เฉพาะตอนกล้องเปิดแล้ว + เครื่องรองรับ torch (Android เป็นหลัก; iOS Safari ไม่รองรับ) -->
+      <button id="torchBtnIssue" class="ghost mt8 hidden" onclick="toggleTorch()">🔦 เปิดไฟฉาย</button>
     </div>
     <div class="card">
       <h2 data-text="recent.title">🕘 เบิกล่าสุด (เซสชันนี้)</h2>
@@ -91,6 +94,7 @@
         <input id="recvVbcInput" autocomplete="off" data-text-placeholder="receive.vbcPlaceholder" placeholder="ยิง / พิมพ์ barcode กล่อง แล้ว Enter">
         <button class="ghost mt8" id="camBtnRecv" onclick="toggleCamRecv()" data-text="receive.camBtn">📸 ใช้กล้องมือถือ</button>
         <div id="readerRecv" class="hidden"></div>
+        <button id="torchBtnRecv" class="ghost mt8 hidden" onclick="toggleTorch()">🔦 เปิดไฟฉาย</button>
       </div>
       <label data-text="receive.pickLabel">หรือเลือกจากรายการ</label>
       <select id="recvProductSel">
@@ -168,9 +172,9 @@
 <div id="printArea"></div>
 
 <!-- T-030: JS แตกเป็นไฟล์ — ลำดับสำคัญ (app-text -> api -> app) และต้องอยู่ท้าย body (มี addEventListener นอก DOMContentLoaded) -->
-<script src="app-text.js?v=20260703"></script>
+<script src="app-text.js?v=20260705"></script>
 <script src="api.js?v=20260702"></script>
 <script src="labels.js?v=20260613"></script>
-<script src="app.js?v=20260702"></script>
+<script src="app.js?v=20260705"></script>
 </body>
 </html>

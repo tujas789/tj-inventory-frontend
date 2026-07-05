@@ -120,6 +120,11 @@ function renderRecent(){
 let cam=null;
 let camReaderId=null;   // จำว่าเปิดกล้องอยู่ที่ reader ตัวไหน (กดปุ่มเดิมซ้ำ = ปิด)
 let activeCamCfg=null;  // [T-043] cfg ของกล้องที่เปิดอยู่ — ไว้คืนสถานะปุ่มตอน stopCam
+// [T-062] generation token — cam.start() ยกเลิกกลางคันไม่ได้ (Promise.race แค่เลิกรอ ไม่ได้หยุดกล้อง)
+//   ทุกครั้งที่เปิดใหม่/ปิด จะ ++camGen ถ้า start รอบเก่ามาเสร็จทีหลังแล้ว token ไม่ตรง = stale → ดับ stream ทิ้งทันที
+//   (บั๊กเดิม: timeout 15 วิ หรือกดปิดตอนกล้องกำลังเปิด → กล้องเปิดติดทีหลังโดย cam=null ไปแล้ว = ไฟกล้องค้าง ปิดไม่ได้)
+let camGen=0;
+let torchOn=false;      // [T-062] สถานะไฟฉายของกล้องที่เปิดอยู่
 // [T-042] config กล้องต่างกันต่อแท็บ (อย่ารวมเป็นค่าเดียว) — เหตุผล:
 //   · แท็บเบิก = ยิง "ฉลากเราเอง" (มี QR+Code128) บน iPhone ต้องพึ่ง QR → กรอบจัตุรัส (T-015/ADR-0003)
 //   · แท็บรับเข้า = ยิง "กล่องผู้ขาย" บาร์โค้ด 1D ทรงยาว (EAN/UPC/Code39/128) ไม่มี QR → กรอบแถบกว้าง
@@ -130,6 +135,7 @@ const SCAN_ISSUE = {
   // qrbox "จัตุรัส" ตามรูปทรง QR (เดิมผืนผ้า 280×140 ไม่พอดี) — ปรับตามขนาดจอ
   qrbox: (vw,vh)=>{ const m=Math.floor(Math.min(vw,vh)*0.72); return {width:m,height:m}; },
   btn: 'camBtnIssue',                          // [T-043] ปุ่มที่เปิดกล้องนี้ — ไว้สลับ label ตอนเปิด/ปิด
+  torchBtn: 'torchBtnIssue',                   // [T-062] ปุ่มไฟฉายประจำ reader นี้
   labelOpen:  ()=>APP_TEXT.issue.camBtn,
   labelClose: ()=>APP_TEXT.issue.camBtnClose,
 };
@@ -139,6 +145,7 @@ const SCAN_VENDOR = {
   // qrbox "แถบนอน" ตามทรงบาร์โค้ด 1D — กว้าง 88% ของจอ × สูง ~42% ของความกว้าง (จูนต่อบนมือถือจริงได้)
   qrbox: (vw,vh)=>{ const w=Math.floor(vw*0.88); const h=Math.floor(Math.min(w*0.42, vh*0.6)); return {width:w,height:h}; },
   btn: 'camBtnRecv',
+  torchBtn: 'torchBtnRecv',
   labelOpen:  ()=>APP_TEXT.receive.camBtn,
   labelClose: ()=>APP_TEXT.receive.camBtnClose,
 };
@@ -162,7 +169,10 @@ function startCamScan(readerId, cfg, onCode){
   // เปิด BarcodeDetector native ของเครื่อง (Android Chrome เร็ว/แม่นกว่า ZXing ; iOS ไม่มี → fallback ZXing เอง)
   const camCfg={verbose:false, experimentalFeatures:{useBarCodeDetectorIfSupported:true}};
   if(window.Html5QrcodeSupportedFormats){ camCfg.formatsToSupport=cfg.formats(); }
-  cam=new Html5Qrcode(readerId, camCfg);
+  // [T-062] เก็บ instance ใน const inst (ไม่พึ่ง global cam) — callback ของ start ต้องชี้ตัวเองได้แม้ cam ถูกเคลียร์ไปแล้ว
+  const inst=new Html5Qrcode(readerId, camCfg);
+  const myGen=++camGen;                         // token รอบนี้ — stopCam/เปิดรอบใหม่จะ ++ ทำให้รอบนี้ stale
+  cam=inst;
   camReaderId=readerId;
   activeCamCfg=cfg;
   setCamBtn(cfg, true);                         // [T-043] ปุ่ม → "ปิดกล้อง"
@@ -172,17 +182,67 @@ function startCamScan(readerId, cfg, onCode){
                            facingMode:{ideal:'environment'}, advanced:[{focusMode:'continuous'}] };
   // [review I5] บาง device cam.start() ค้าง (ไม่ resolve/reject) → ปุ่มค้างสถานะ "ปิดกล้อง" ตลอด
   //   Promise.race กับ timeout 15 วิ → เด้ง error + คืนสถานะปุ่ม (ถ้ากล้องมาทันก่อน timeout = ไม่กระทบ)
-  const startP = cam.start({facingMode:'environment'},{fps:12,qrbox:cfg.qrbox,videoConstraints:videoConstraints},
+  // [T-062] fps 12→15 — เฟรมถี่ขึ้น จับติดง่ายขึ้นตอนมือสั่น (แลกแบตนิดหน่อย)
+  const startP = inst.start({facingMode:'environment'},{fps:15,qrbox:cfg.qrbox,videoConstraints:videoConstraints},
     txt=>{ stopCam(); onCode(txt); },
     ()=>{});
-  const timeoutP = new Promise((_,rej)=>setTimeout(()=>rej(new Error('เปิดกล้องไม่สำเร็จใน 15 วินาที — ลองใหม่หรือตรวจสิทธิ์กล้อง')),15000));
+  startP.then(()=>{
+    // [T-062] start มาเสร็จ "หลัง" ถูกยกเลิก (timeout/กดปิด/สลับ reader) → ดับ stream ทิ้ง กันกล้องติดค้าง
+    if(myGen!==camGen){ inst.stop().then(()=>inst.clear()).catch(()=>{}); return; }
+    showTorchBtn(inst, cfg);                    // เปิดสำเร็จจริง → โชว์ปุ่มไฟฉายถ้าเครื่องรองรับ
+  }).catch(()=>{});                             // error แจ้งผ่าน race ด้านล่างแล้ว — กัน unhandled rejection ซ้ำ
+  const timeoutP = new Promise((_,rej)=>setTimeout(()=>rej(new Error(APP_TEXT.cam.timeout)),15000));
   Promise.race([startP, timeoutP])
-    .catch(e=>{ stopCam(); toast(tf(APP_TEXT.cam.openFailTpl,{msg:e}),false); });  // [T-043] เปิดไม่ได้ → คืนสถานะปุ่ม/reader
+    .catch(e=>{
+      if(myGen!==camGen) return;                // ถูกปิดไปก่อนแล้ว (เช่นผู้ใช้กดปิดเอง) — ไม่ต้องเด้ง error ซ้ำ
+      stopCam();                                // [T-043] เปิดไม่ได้ → คืนสถานะปุ่ม/reader
+      // [T-062] แยกกรณีไม่ให้สิทธิ์กล้อง — บอกวิธีแก้ตรง ๆ ผู้ใช้หน้างานแก้เองได้
+      //   เช็คจาก "ข้อความ" ไม่ใช่ e.name เพราะ html5-qrcode ห่อ error เป็น string เช่น
+      //   "Error getting userMedia, error = NotAllowedError: Permission denied" (ทดสอบจริง 2026-07-05)
+      const raw=(e && e.message) || String(e);
+      const msg=/NotAllowedError|Permission denied/i.test(raw) ? APP_TEXT.cam.permissionDenied : raw;
+      toast(tf(APP_TEXT.cam.openFailTpl,{msg}),false);
+    });
 }
 function stopCam(){
-  if(cam){ cam.stop().then(()=>cam.clear()).catch(()=>{}); cam=null; }
+  camGen++;   // [T-062] ตัด start รอบที่อาจยัง pending ให้ stale — มาเสร็จทีหลังจะดับตัวเองใน startP.then
+  // [T-062] stop() ของ html5-qrcode "throw sync" ถ้ากล้องยังไม่ทัน start เสร็จ (ไม่ใช่ reject) → ต้อง try/catch
+  //   ไม่งั้น stopCam ระเบิดกลางทาง ปุ่ม/reader ค้างสถานะเปิด — กรณีกล้องยัง pending ปล่อยให้ stale token ดับแทน
+  if(cam){ const c=cam; cam=null; try{ c.stop().then(()=>c.clear()).catch(()=>{}); }catch(_){} }
+  hideTorchBtns();
   if(activeCamCfg){ setCamBtn(activeCamCfg, false); activeCamCfg=null; }   // [T-043] ปุ่มกลับเป็น label เดิม
   if(camReaderId){ $(camReaderId).classList.add('hidden'); camReaderId=null; }
+}
+// [T-062] พับแอป/สลับแอปทั้งที่กล้องเปิด → ปิดทันที (กัน stream ค้างตอนกลับมา + ประหยัดแบต)
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopCam(); });
+
+/* ===== [T-062] ไฟฉาย (torch) — แสงน้อยคือสาเหตุหลักของ "ยิงไม่ติด" หน้างาน ===== */
+// โชว์ปุ่มเฉพาะเมื่อ track ที่กำลังวิ่งรองรับ torch (Android Chrome ส่วนใหญ่ได้ / iOS Safari ไม่ได้ → ไม่โชว์)
+function showTorchBtn(inst, cfg){
+  torchOn=false;
+  const b=$(cfg.torchBtn); if(!b) return;
+  let caps={};
+  try{ caps=inst.getRunningTrackCapabilities()||{}; }catch(_){}
+  if(!caps.torch) return;                       // เครื่องไม่รองรับ → ปุ่มซ่อนไว้ตามเดิม
+  b.textContent=APP_TEXT.cam.torchOn;
+  b.classList.remove('hidden');
+}
+function hideTorchBtns(){
+  torchOn=false;
+  [SCAN_ISSUE.torchBtn, SCAN_VENDOR.torchBtn].forEach(id=>{ const b=$(id); if(b) b.classList.add('hidden'); });
+}
+function toggleTorch(){
+  if(!cam) return;
+  const want=!torchOn;
+  let p;
+  try{ p=cam.applyVideoConstraints({advanced:[{torch:want}]}); }
+  catch(_){ toast(APP_TEXT.cam.torchFail,false); return; }   // กัน throw sync แบบเดียวกับ stop()
+  p.then(()=>{
+      torchOn=want;
+      const b=activeCamCfg && $(activeCamCfg.torchBtn);
+      if(b) b.textContent=torchOn?APP_TEXT.cam.torchOff:APP_TEXT.cam.torchOn;
+    })
+    .catch(()=>toast(APP_TEXT.cam.torchFail,false));
 }
 
 // แท็บเบิกจ่าย: สแกน→ตัดเหลือเลข (ADR-0003)→ใส่กล่อง→กดยืนยัน (ไม่ตัดทันที กันยิงผิดตัด — T-013)
