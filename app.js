@@ -76,7 +76,8 @@ function hideAdminTab(){
 //   + ยิง getProducts?include_inactive ซึ่งเป็น public GET ได้) → ต้อง reconcile กับ role ที่ server ยืนยันจริง
 //   ทุกครั้งที่ checkToken ผ่าน (เงียบๆ ตอนเปิดแอป — ไม่ถ่วง UX เดิม)
 function applyRoleFromAuth(auth){
-  if(!auth || !auth.ok || !CURRENT) return;
+  // !auth.role: กัน response ที่ไม่พก role มา (เช่น demo checkToken คืนแค่ {ok:true}) ไปทับค่าดีด้วย undefined
+  if(!auth || !auth.ok || !auth.role || !CURRENT) return;
   CURRENT.role=auth.role; CURRENT.display_name=auth.display_name;
   saveSession(CURRENT);
   $('whoName').textContent=CURRENT.display_name;
