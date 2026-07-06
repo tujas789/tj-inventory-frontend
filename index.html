@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Thai+Looped:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css?v=20260614">
-<link rel="stylesheet" href="style.css?v=20260706">
+<link rel="stylesheet" href="style.css?v=20260706a">
 </head>
 <body>
 
@@ -61,6 +61,8 @@
     <button id="tab-btn-receive" class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-receive" onclick="showTab('receive')" data-text="tabs.receive">🧺 รับเข้า</button>
     <button id="tab-btn-stock"   class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-stock"   onclick="showTab('stock')"   data-text="tabs.stock">🫙 สต๊อก</button>
     <button id="tab-btn-expiry"  class="tab-btn"        role="tab" aria-selected="false" aria-controls="tab-expiry"  onclick="showTab('expiry')"  data-text="tabs.expiry">⏳ หมดอายุ</button>
+    <!-- [T-066] แท็บจัดการ — โชว์เฉพาะ role=admin (enterApp เป็นคน toggle; เกราะจริงคือ ADMIN_ACTIONS ฝั่ง server) -->
+    <button id="tab-btn-admin"   class="tab-btn hidden" role="tab" aria-selected="false" aria-controls="tab-admin"   onclick="showTab('admin')"   data-text="tabs.admin">⚙️ จัดการ</button>
   </div>
 
   <!-- ===== Tab: เบิกจ่าย ===== -->
@@ -164,6 +166,65 @@
       <div id="expiryList"></div>
     </div>
   </section>
+
+  <!-- ===== Tab: จัดการ (admin เท่านั้น — T-066 · ADR-0005) ===== -->
+  <section id="tab-admin" class="wrap hidden" role="tabpanel" aria-labelledby="tab-btn-admin">
+
+    <!-- Card 1: จัดการชนิดน้ำยา -->
+    <div class="card">
+      <h2><span data-text="admin.productTitle">🧴 จัดการชนิดน้ำยา</span> <button class="ghost sm push-r" onclick="initAdminTab()" data-text="admin.refreshBtn">🔄 รีเฟรช</button></h2>
+      <label data-text="admin.pickLabel">เลือกชนิดที่จะจัดการ</label>
+      <select id="admProductSel" onchange="onAdminProductChange()">
+        <option value="" data-text="admin.loading">— กำลังโหลด... —</option>
+      </select>
+      <div id="admProductForm" class="hidden">
+        <hr class="div">
+        <label data-text="admin.nameLabel">ชื่อน้ำยา *</label>
+        <input id="admName" autocomplete="off">
+        <label data-text="admin.uomLabel">หน่วยนับ *</label>
+        <input id="admUom" autocomplete="off">
+        <label data-text="admin.vbcLabel">barcode กล่อง (vendor) — ถ้ามี</label>
+        <input id="admVbc" autocomplete="off">
+        <button class="green" id="admSaveBtn" onclick="admSaveProduct()" data-text="admin.saveBtn">💾 บันทึกการแก้ไข</button>
+        <div class="row">
+          <button class="ghost" id="admToggleActiveBtn" onclick="admToggleActive()">🚫 ปิดใช้งาน</button>
+          <button class="ghost" id="admDeleteBtn" onclick="admDeleteProduct()" data-text="admin.deleteBtn">🗑️ ลบถาวร</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: ยกเลิกกล่องรับเข้าผิด (void) -->
+    <div class="card">
+      <h2 data-text="admin.voidTitle">🚮 ยกเลิกกล่องรับเข้าผิด</h2>
+      <div class="muted" data-text="admin.voidHint">ตัดกล่องที่รับเข้าผิด/ซ้ำออกจากสต๊อก — กล่องที่ถูกเบิกแล้วต้อง "คืนสต๊อก" ก่อน</div>
+      <label data-text="admin.unitLabel">unit_barcode *</label>
+      <input id="admVoidBc" autocomplete="off" data-text-placeholder="admin.unitPlaceholder" placeholder="ยิง / พิมพ์ unit_barcode">
+      <label data-text="admin.reasonLabel">เหตุผล * (บันทึกลงประวัติ)</label>
+      <input id="admVoidReason" autocomplete="off" data-text-placeholder="admin.reasonPlaceholder" placeholder="เช่น รับเข้าซ้ำ / คีย์ผิดชนิด">
+      <button class="ghost" id="admVoidBtn" onclick="admVoid()" data-text="admin.voidBtn">🚮 ยกเลิกกล่องนี้</button>
+    </div>
+
+    <!-- Card 3: คืนสต๊อก (unissue) -->
+    <div class="card">
+      <h2 data-text="admin.unissueTitle">↩️ คืนสต๊อก (ยกเลิกการเบิก)</h2>
+      <div class="muted" data-text="admin.unissueHint">เบิกผิดตัว — คืนกล่องกลับเข้าสต๊อก (ประวัติการเบิกเดิมยังอยู่ในระบบ)</div>
+      <label data-text="admin.unitLabel">unit_barcode *</label>
+      <input id="admUnissueBc" autocomplete="off" data-text-placeholder="admin.unitPlaceholder" placeholder="ยิง / พิมพ์ unit_barcode">
+      <label data-text="admin.reasonLabel">เหตุผล * (บันทึกลงประวัติ)</label>
+      <input id="admUnissueReason" autocomplete="off" data-text-placeholder="admin.reasonPlaceholder" placeholder="เช่น ยิงผิดกล่อง / ยกเลิกงาน">
+      <button class="ghost" id="admUnissueBtn" onclick="admUnissue()" data-text="admin.unissueBtn">↩️ คืนสต๊อกกล่องนี้</button>
+    </div>
+
+    <!-- กล่องยืนยัน 2 ชั้น (แชร์ทุกการ์ด — โผล่เมื่อกดปุ่ม destructive) -->
+    <div id="admConfirm" class="card confirm-box hidden">
+      <div class="sub-label" data-text="admin.confirmHead">ยืนยันการทำรายการ</div>
+      <div id="admConfirmText"></div>
+      <div class="row">
+        <button class="danger" id="admConfirmYesBtn" onclick="admConfirmYes()" data-text="admin.confirmBtn">✔ ยืนยัน</button>
+        <button class="ghost" onclick="adminCancelConfirm()" data-text="admin.cancelBtn">ยกเลิก</button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -172,9 +233,9 @@
 <div id="printArea"></div>
 
 <!-- T-030: JS แตกเป็นไฟล์ — ลำดับสำคัญ (app-text -> api -> app) และต้องอยู่ท้าย body (มี addEventListener นอก DOMContentLoaded) -->
-<script src="app-text.js?v=20260706"></script>
-<script src="api.js?v=20260702"></script>
+<script src="app-text.js?v=20260706a"></script>
+<script src="api.js?v=20260706a"></script>
 <script src="labels.js?v=20260613"></script>
-<script src="app.js?v=20260706"></script>
+<script src="app.js?v=20260706a"></script>
 </body>
 </html>

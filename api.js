@@ -57,8 +57,10 @@ const DEMO = (function(){
     {user_id:'somchai', display_name:'สมชาย คลัง (เดโม)',  role:'staff'},
   ];
   const products = [
-    {product_id:'P0001', name:'น้ำยาล้างคราบ A', vendor_barcode:'8850123456789', unit_of_measure:'ขวด'},
-    {product_id:'P0002', name:'น้ำยาเคลือบเงา B', vendor_barcode:'8850987654321', unit_of_measure:'แกลลอน'},
+    {product_id:'P0001', name:'น้ำยาล้างคราบ A', vendor_barcode:'8850123456789', unit_of_measure:'ขวด', is_active:true},
+    {product_id:'P0002', name:'น้ำยาเคลือบเงา B', vendor_barcode:'8850987654321', unit_of_measure:'แกลลอน', is_active:true},
+    // [T-066] ชนิดไม่มี Lot — ไว้ทดสอบ "ลบถาวร" ในแท็บจัดการ (สองตัวบนมี lot → โดน blocked)
+    {product_id:'P0003', name:'น้ำยาทดสอบ C (ยังไม่มีล็อต)', vendor_barcode:'', unit_of_measure:'ถัง', is_active:true},
   ];
   const lots = [
     {lot_id:'L000012', product_id:'P0001', lot_no:'LOT-2026-A', expiry_date:addDays(10)},   // ใกล้หมด
@@ -95,9 +97,14 @@ const DEMO = (function(){
     },
     checkToken(){ return {ok:true}; },   // [T-014]
     logout(){ return {ok:true}; },       // [T-014]
-    getProducts(){ return {ok:true, products:products.map(p=>({...p}))}; },
+    // [T-066] include_inactive='1' → คืนทุกชนิดพร้อม is_active (แท็บจัดการ) / ปกติกรองเฉพาะ active (เหมือน backend)
+    getProducts(p){
+      const all=(p&&p.include_inactive==='1');
+      const list=products.filter(x=>all||x.is_active!==false);
+      return {ok:true, products:list.map(x=>{ const o={...x}; if(!all) delete o.is_active; return o; })};
+    },
     lookupByVendorBarcode(p){
-      const found=products.filter(x=>x.vendor_barcode===String(p.vendor_barcode).trim());
+      const found=products.filter(x=>x.is_active!==false && x.vendor_barcode===String(p.vendor_barcode).trim());
       return {ok:true, products:found.map(x=>({...x}))};
     },
     receiveForUI(p){
@@ -105,7 +112,7 @@ const DEMO = (function(){
       if(!pid){
         if(!p.new_product||!p.new_product.name) return {ok:false,error:'กรุณาเลือกชนิด (เดโม)'};
         pid='P'+String(++seqProd).padStart(4,'0');
-        products.push({product_id:pid, name:p.new_product.name, vendor_barcode:p.new_product.vendor_barcode||'', unit_of_measure:p.new_product.unit_of_measure||''});
+        products.push({product_id:pid, name:p.new_product.name, vendor_barcode:p.new_product.vendor_barcode||'', unit_of_measure:p.new_product.unit_of_measure||'', is_active:true});
         pname=p.new_product.name;
       } else pname=nameOf(pid);
       const lid='L'+String(++seqLot).padStart(6,'0');
@@ -138,7 +145,8 @@ const DEMO = (function(){
     stockByProduct(){
       const counts={}; let total=0;
       units.forEach(u=>{ if(u.status==='in_stock'){ counts[u.product_id]=(counts[u.product_id]||0)+1; total++; } });
-      const rows=products.map(p=>({product_id:p.product_id, name:p.name, in_stock:counts[p.product_id]||0}));
+      // [T-066] กรอง inactive เหมือน backend (04_stock.gs)
+      const rows=products.filter(p=>p.is_active!==false).map(p=>({product_id:p.product_id, name:p.name, in_stock:counts[p.product_id]||0}));
       return {ok:true, rows, total};
     },
     stockByLot(p){
@@ -158,6 +166,59 @@ const DEMO = (function(){
       }));
       us.sort((a,b)=> a.status!==b.status ? (a.status==='in_stock'?-1:1) : (a.unit_barcode<b.unit_barcode?-1:1));
       return {ok:true, lot_id:lid, in_stock:us.filter(u=>u.status==='in_stock').length, units:us};
+    },
+    // ===== [T-066 · ADR-0005] แท็บจัดการ (admin) — จำลอง validation เดียวกับ 13_admin.gs =====
+    updateProduct(p){
+      const prod=products.find(x=>x.product_id===String(p.product_id));
+      if(!prod) return {ok:false, error:'ไม่พบชนิดน้ำยา (เดโม)'};
+      if(!String(p.name||'').trim()) return {ok:false, error:'ชื่อชนิดน้ำยาห้ามว่าง'};
+      if(!String(p.unit_of_measure||'').trim()) return {ok:false, error:'หน่วยนับห้ามว่าง'};
+      prod.name=String(p.name).trim(); prod.unit_of_measure=String(p.unit_of_measure).trim();
+      prod.vendor_barcode=String(p.vendor_barcode||'').trim();
+      return {ok:true, product_id:prod.product_id};
+    },
+    setProductActive(p){
+      const prod=products.find(x=>x.product_id===String(p.product_id));
+      if(!prod) return {ok:false, error:'ไม่พบชนิดน้ำยา (เดโม)'};
+      const active=(p.is_active===true||String(p.is_active).toUpperCase()==='TRUE');
+      // [Codex review 2026-07-06 · P2] จำลอง guard เดียวกับ backend — ปิดใช้งานไม่ได้ถ้ายังมี Unit in_stock
+      if(!active){
+        const inStock=units.filter(u=>u.product_id===prod.product_id && u.status==='in_stock').length;
+        if(inStock>0) return {ok:false, error:'ยังมีของเหลืออยู่ '+inStock+' ชิ้นในสต๊อก — เบิก/ย้ายให้หมดก่อนถึงจะปิดใช้งานได้'};
+      }
+      prod.is_active=active;
+      return {ok:true, product_id:prod.product_id, is_active:prod.is_active};
+    },
+    deleteProductAdmin(p){
+      const pid=String(p.product_id);
+      const dryRun=(p.confirm!=='DELETE');
+      const report={ok:true, dryRun, deleted:[], blocked:{}, notFound:[]};
+      const idx=products.findIndex(x=>x.product_id===pid);
+      if(idx<0){ report.notFound.push(pid); return report; }
+      const lotCount=lots.filter(l=>l.product_id===pid).length;
+      if(lotCount){ report.blocked[pid]='มี Lot ผูกอยู่ '+lotCount+' รายการ — ลบไม่ได้ (ใช้ is_active=FALSE แทน)'; return report; }
+      if(dryRun){ report.will_delete=[pid]; } else { products.splice(idx,1); report.deleted.push(pid); }
+      return report;
+    },
+    voidUnit(p){
+      if(!String(p.reason||'').trim()) return {ok:false, error:'ต้องระบุเหตุผล — จะถูกบันทึกลงประวัติ (Transaction)'};
+      const u=units.find(x=>x.unit_barcode===String(p.unit_barcode).trim());
+      if(!u) return {ok:false, error:'ไม่พบ barcode นี้ในระบบ: '+p.unit_barcode};
+      if(u.status!=='in_stock') return {ok:false, error:u.status==='issued'
+        ? 'กล่องนี้ถูกเบิกไปแล้ว — ต้อง "คืนสต๊อก" ก่อนถึงจะยกเลิกได้'
+        : 'กล่องนี้ถูกยกเลิกไปแล้ว (status='+u.status+')'};
+      u.status='void';
+      return {ok:true, unit_barcode:u.unit_barcode, product_id:u.product_id, lot_id:u.lot_id, txn_id:'T'+String(++seqTxn).padStart(8,'0')};
+    },
+    unissueUnit(p){
+      if(!String(p.reason||'').trim()) return {ok:false, error:'ต้องระบุเหตุผล — จะถูกบันทึกลงประวัติ (Transaction)'};
+      const u=units.find(x=>x.unit_barcode===String(p.unit_barcode).trim());
+      if(!u) return {ok:false, error:'ไม่พบ barcode นี้ในระบบ: '+p.unit_barcode};
+      if(u.status!=='issued') return {ok:false, error:u.status==='in_stock'
+        ? 'กล่องนี้ยังไม่ถูกเบิก — ไม่มีอะไรให้คืน'
+        : 'กล่องนี้ถูกยกเลิกไปแล้ว (status='+u.status+') คืนไม่ได้'};
+      u.status='in_stock';
+      return {ok:true, unit_barcode:u.unit_barcode, product_id:u.product_id, lot_id:u.lot_id, txn_id:'T'+String(++seqTxn).padStart(8,'0')};
     },
     expiringLots(p){
       const warn=(p&&p.warn_days!=null&&p.warn_days!=='')?Number(p.warn_days):60;

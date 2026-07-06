@@ -83,6 +83,8 @@
   }
   button.sm{ width:auto; padding:9px 14px; font-size:13px; margin:0; box-shadow:2px 2px 0 var(--ink); }
   button.sm:active{ transform:translate(2px,2px); box-shadow:none; }
+  /* [T-066] ปุ่มยืนยัน destructive ในแท็บจัดการ — แดง danger ให้รู้ว่าอันตราย */
+  button.danger{ background:var(--dan); }
   button:disabled{ opacity:.45; cursor:default; filter:none; }
   .row{ display:flex; gap:10px; } .row>*{ flex:1; }
   hr.div{ border:none; border-top:1px solid var(--hair); margin:14px 0; }
@@ -142,6 +144,9 @@
   .unit-line .bc{ font-family:var(--mono); font-weight:500; letter-spacing:.5px; color:var(--ink); }
   .unit-line.issued .bc{ color:var(--mut2); text-decoration:line-through; }
   .unit-ok{ color:var(--green); font-weight:600; }
+  /* [T-066] กล่องยืนยัน 2 ชั้นของแท็บจัดการ — กรอบแดงเตือนก่อนทำ destructive action */
+  .confirm-box{ border-color:var(--dan); background:rgba(198,69,69,.06); box-shadow:3px 3px 0 var(--dan); }
+  .confirm-box #admConfirmText{ font-size:15px; line-height:1.65; }
   /* ─── spacing utilities — แทน inline style ให้จังหวะเดียวกันทั้งแอป ─── */
   .mt8{ margin-top:8px; } .mt10{ margin-top:10px; }
   button.push-r{ margin-left:auto; }        /* หลัง button.sm — ชนะ margin:0 ของ .sm */

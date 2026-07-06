@@ -9,6 +9,7 @@ function loadSession(){ try{ const r=localStorage.getItem('tj_user'); return r?J
 function forceRelogin(){
   if(!CURRENT) return;
   stopCam(); CURRENT=null; clearSession();
+  hideAdminTab();   // [T-066]
   $('app').classList.add('hidden'); $('login').classList.remove('hidden');
   $('pinInput').value='';
   toast(APP_TEXT.login.sessionExpired, false);
@@ -53,23 +54,46 @@ function doLogout(){
   // [T-014] แจ้ง server ลบ token (best-effort — เน็ตล่มก็ออกจากหน้าจอได้)
   if(CURRENT && CURRENT.token){ try{ apiPost({action:'logout'}).catch(()=>{}); }catch(e){} }
   stopCam(); CURRENT=null; clearSession();
+  hideAdminTab();   // [T-066]
   $('app').classList.add('hidden'); $('login').classList.remove('hidden');
   $('pinInput').value=''; $('pinInput').focus();
 }
 function enterApp(){
   $('whoName').textContent=CURRENT.display_name;
   $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+  // [T-066] แท็บจัดการโชว์เฉพาะ admin — แค่ UX ซ่อนปุ่ม เกราะจริงคือ ADMIN_ACTIONS เช็ค role ฝั่ง server (ADR-0005)
+  $('tab-btn-admin').classList.toggle('hidden', CURRENT.role!=='admin');
   renderRecent();   // [review I2] วาดประวัติที่กู้จาก sessionStorage (กัน refresh มือถือแล้วลิสต์ว่าง)
   showTab('issue');
+}
+// [T-066] ออกจากระบบ/เซสชันตาย → ซ่อนแท็บจัดการ + ให้โหลดใหม่ตอน admin คนถัดไปเข้า
+function hideAdminTab(){
+  $('tab-btn-admin').classList.add('hidden');
+  adminTabInited=false;
+}
+// [Codex review 2026-07-06 · P2] role ใน localStorage เชื่อได้แค่ "ตอนบันทึก" — คนแก้ค่าผ่าน devtools
+//   ได้ (role:'admin') แล้วเห็นแท็บจัดการ (แม้ POST จริงจะโดน ADMIN_ACTIONS บล็อกอยู่แล้ว แต่ยังเห็น UI
+//   + ยิง getProducts?include_inactive ซึ่งเป็น public GET ได้) → ต้อง reconcile กับ role ที่ server ยืนยันจริง
+//   ทุกครั้งที่ checkToken ผ่าน (เงียบๆ ตอนเปิดแอป — ไม่ถ่วง UX เดิม)
+function applyRoleFromAuth(auth){
+  if(!auth || !auth.ok || !CURRENT) return;
+  CURRENT.role=auth.role; CURRENT.display_name=auth.display_name;
+  saveSession(CURRENT);
+  $('whoName').textContent=CURRENT.display_name;
+  const wasVisible=!$('tab-btn-admin').classList.contains('hidden');
+  $('tab-btn-admin').classList.toggle('hidden', CURRENT.role!=='admin');
+  // แท็บจัดการกำลังเปิดอยู่แต่ role จริงไม่ใช่ admin (แก้ localStorage เอง) → เด้งกลับแท็บเบิก
+  if(wasVisible && CURRENT.role!=='admin' && !$('tab-admin').classList.contains('hidden')) showTab('issue');
 }
 
 /* ===== Tabs ===== */
 let receiveTabInited=false;
 let expiryTabInited=false;
 let stockTabInited=false;
+let adminTabInited=false;   // [T-066]
 function showTab(name){
   stopCam();   // กันกล้องค้างเปิดข้ามแท็บ (เบิก/รับเข้า ใช้กล้องร่วมกัน)
-  ['issue','receive','stock','expiry'].forEach(n=>{
+  ['issue','receive','stock','expiry','admin'].forEach(n=>{
     $('tab-'+n).classList.toggle('hidden', n!==name);
     const btn=$('tab-btn-'+n);
     btn.classList.toggle('active', n===name);
@@ -82,6 +106,7 @@ function showTab(name){
   }
   if(name==='stock' && !stockTabInited){ stockTabInited=true; initStockTab(); }
   if(name==='expiry' && !expiryTabInited){ expiryTabInited=true; initExpiryTab(); }
+  if(name==='admin' && !adminTabInited){ adminTabInited=true; initAdminTab(); }   // [T-066]
 }
 
 /* ===== เบิกจ่าย ===== */
@@ -624,9 +649,11 @@ function renderUnits(units){
   if(!units||!units.length) return `<div class="muted" style="padding:4px 0">${APP_TEXT.stock.noUnits}</div>`;
   return units.map(u=>{
     const inStock=u.status==='in_stock';
-    const right=inStock
-      ? `<span class="unit-ok">${APP_TEXT.stock.unitInStock}</span>`
-      : `<span class="muted">${tf(APP_TEXT.stock.unitIssuedTpl,
+    // [T-066] unit ที่ถูก void (ADR-0005) — ขีดฆ่าเหมือน issued แต่ป้ายบอกว่า "ยกเลิกแล้ว"
+    let right;
+    if(inStock) right=`<span class="unit-ok">${APP_TEXT.stock.unitInStock}</span>`;
+    else if(u.status==='void') right=`<span class="badge expired">${APP_TEXT.stock.unitVoid}</span>`;
+    else right=`<span class="muted">${tf(APP_TEXT.stock.unitIssuedTpl,
           {user:esc(u.issued_by||'-'), date:esc((u.issued_at||'').substring(0,10)||'-')})}</span>`;
     return `<div class="unit-line ${inStock?'':'issued'}"><span class="bc">${esc(u.unit_barcode)}</span>${right}</div>`;
   }).join('');
@@ -670,6 +697,154 @@ function renderExpiry(res){
   }).join('');
 }
 
+/* ===== [T-066 · ADR-0005] แท็บจัดการ (admin เท่านั้น) =====
+   ปุ่มแท็บถูกซ่อน/โชว์ตาม role ใน enterApp — เกราะจริงคือ ADMIN_ACTIONS เช็ค role ฝั่ง server
+   ทุก destructive action ผ่านกล่องยืนยัน 2 ชั้น (#admConfirm) + เหตุผลบังคับสำหรับ void/unissue */
+let adminProducts=[];
+let admPending=null;   // {type:'void'|'unissue'|'toggleActive'|'delete', payload} — รายการที่รอกดยืนยัน
+
+function initAdminTab(){
+  adminCancelConfirm();
+  $('admProductForm').classList.add('hidden');
+  apiGet('getProducts',{include_inactive:'1'})
+    .then(res=>{
+      adminProducts=(res&&res.ok)?res.products:[];
+      renderAdminProductSel();
+    })
+    .catch(e=>toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false));
+}
+
+function renderAdminProductSel(){
+  const sel=$('admProductSel');
+  if(!adminProducts.length){ sel.innerHTML=`<option value="">${APP_TEXT.admin.noProducts}</option>`; return; }
+  sel.innerHTML=`<option value="">${APP_TEXT.admin.pickProduct}</option>`+
+    adminProducts.map(p=>`<option value="${esc(p.product_id)}">${esc(p.name)}${p.is_active===false?' '+APP_TEXT.admin.inactiveSuffix:''}</option>`).join('');
+}
+
+function onAdminProductChange(){
+  adminCancelConfirm();
+  const p=adminProducts.find(x=>x.product_id===$('admProductSel').value);
+  $('admProductForm').classList.toggle('hidden', !p);
+  if(!p) return;
+  $('admName').value=p.name||'';
+  $('admUom').value=p.unit_of_measure||'';
+  $('admVbc').value=p.vendor_barcode||'';
+  $('admToggleActiveBtn').textContent = p.is_active===false ? APP_TEXT.admin.activateBtn : APP_TEXT.admin.deactivateBtn;
+}
+
+// แก้ Product = ไม่ destructive → ไม่ต้องผ่านกล่องยืนยัน (validate แล้วยิงเลย)
+function admSaveProduct(){
+  const pid=$('admProductSel').value;
+  if(!pid||busy) return;
+  const name=$('admName').value.trim();
+  const uom=$('admUom').value.trim();
+  if(!name){ toast(APP_TEXT.admin.needName,false); $('admName').focus(); return; }
+  if(!uom){ toast(APP_TEXT.admin.needUom,false); $('admUom').focus(); return; }
+  busy=true; $('admSaveBtn').disabled=true;
+  apiPost({action:'updateProduct', product_id:pid, name, unit_of_measure:uom, vendor_barcode:$('admVbc').value.trim()})
+    .then(res=>{
+      busy=false; $('admSaveBtn').disabled=false;
+      if(!res||!res.ok){ toast(tf(APP_TEXT.admin.failTpl,{msg:(res&&res.error)||APP_TEXT.common.loadFail}),false); return; }
+      toast(APP_TEXT.admin.saveOk);
+      admRefreshAfterChange();
+    })
+    .catch(e=>{ busy=false; $('admSaveBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
+}
+
+// เปิดกล่องยืนยัน 2 ชั้น — html ต้องผ่าน esc() มาแล้วจาก caller (ค่าใน tpl มี <b> ที่ตั้งใจ)
+function admAsk(type, html, payload){
+  admPending={type, payload};
+  $('admConfirmText').innerHTML=html;
+  $('admConfirm').classList.remove('hidden');
+  $('admConfirm').scrollIntoView({block:'nearest'});
+}
+function adminCancelConfirm(){
+  admPending=null;
+  const box=$('admConfirm');
+  if(box) box.classList.add('hidden');
+}
+
+function admToggleActive(){
+  const p=adminProducts.find(x=>x.product_id===$('admProductSel').value);
+  if(!p) return;
+  const activate = p.is_active===false;
+  const tpl = activate ? APP_TEXT.admin.confirmActivateTpl : APP_TEXT.admin.confirmDeactivateTpl;
+  admAsk('toggleActive', tf(tpl,{name:esc(p.name)}), {product_id:p.product_id, is_active:activate});
+}
+
+// ลบถาวร: step 1 = dry-run ที่ server (มี Lot → blocked) / step 2 = ยืนยันแล้วยิง confirm:'DELETE'
+function admDeleteProduct(){
+  const p=adminProducts.find(x=>x.product_id===$('admProductSel').value);
+  if(!p||busy) return;
+  busy=true; $('admDeleteBtn').disabled=true;
+  apiPost({action:'deleteProductAdmin', product_id:p.product_id})
+    .then(res=>{
+      busy=false; $('admDeleteBtn').disabled=false;
+      if(!res||!res.ok){ toast(tf(APP_TEXT.admin.failTpl,{msg:(res&&res.error)||APP_TEXT.common.loadFail}),false); return; }
+      const blockedMsg=res.blocked && res.blocked[p.product_id];
+      if(blockedMsg){ toast(tf(APP_TEXT.admin.deleteBlockedTpl,{msg:blockedMsg}),false); return; }
+      if(!res.will_delete || res.will_delete.indexOf(p.product_id)<0){
+        toast(tf(APP_TEXT.admin.failTpl,{msg:res.note||APP_TEXT.common.loadFail}),false); return;
+      }
+      admAsk('delete', tf(APP_TEXT.admin.confirmDeleteTpl,{name:esc(p.name)}), {product_id:p.product_id, confirm:'DELETE', _name:p.name});
+    })
+    .catch(e=>{ busy=false; $('admDeleteBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
+}
+
+// void/unissue: validate barcode (reuse normalizeBarcode + กติกา 8 หลัก ADR-0003) + เหตุผลบังคับ → กล่องยืนยัน
+function admUnitAction(type, bcInputId, reasonInputId, confirmTpl){
+  const bc=normalizeBarcode($(bcInputId).value);
+  const reason=$(reasonInputId).value.trim();
+  if(!bc){ toast(APP_TEXT.admin.needBarcode,false); $(bcInputId).focus(); return; }
+  if(/^\d+$/.test(bc) && bc.length!==8){ toast(tf(APP_TEXT.issue.badFormatTpl,{code:bc}),false); $(bcInputId).select(); return; }
+  if(!reason){ toast(APP_TEXT.admin.needReason,false); $(reasonInputId).focus(); return; }
+  admAsk(type, tf(confirmTpl,{code:esc(bc), reason:esc(reason)}), {unit_barcode:bc, reason});
+}
+function admVoid(){ admUnitAction('void','admVoidBc','admVoidReason',APP_TEXT.admin.confirmVoidTpl); }
+function admUnissue(){ admUnitAction('unissue','admUnissueBc','admUnissueReason',APP_TEXT.admin.confirmUnissueTpl); }
+
+// กดยืนยันในกล่อง → ยิง API จริงตามชนิดรายการที่ค้างอยู่
+function admConfirmYes(){
+  if(!admPending||busy) return;
+  const {type, payload}=admPending;
+  const btn=$('admConfirmYesBtn');
+  busy=true; btn.disabled=true;
+  const done=()=>{ busy=false; btn.disabled=false; };
+  const fail=msg=>{ done(); toast(tf(APP_TEXT.admin.failTpl,{msg}),false); };
+  let req;
+  if(type==='void')         req=apiPost({action:'voidUnit', unit_barcode:payload.unit_barcode, reason:payload.reason, user:CURRENT.user_id});
+  else if(type==='unissue') req=apiPost({action:'unissueUnit', unit_barcode:payload.unit_barcode, reason:payload.reason, user:CURRENT.user_id});
+  else if(type==='toggleActive') req=apiPost({action:'setProductActive', product_id:payload.product_id, is_active:payload.is_active});
+  else if(type==='delete')  req=apiPost({action:'deleteProductAdmin', product_id:payload.product_id, confirm:payload.confirm});
+  else { done(); return; }
+  req.then(res=>{
+      done();
+      if(!res||!res.ok){ toast(tf(APP_TEXT.admin.failTpl,{msg:(res&&res.error)||APP_TEXT.common.loadFail}),false); return; }
+      if(type==='void'){ toast(tf(APP_TEXT.admin.voidOkTpl,{code:payload.unit_barcode})); $('admVoidBc').value=''; $('admVoidReason').value=''; }
+      if(type==='unissue'){ toast(tf(APP_TEXT.admin.unissueOkTpl,{code:payload.unit_barcode})); $('admUnissueBc').value=''; $('admUnissueReason').value=''; }
+      if(type==='toggleActive'){ toast(payload.is_active?APP_TEXT.admin.toggleOkOn:APP_TEXT.admin.toggleOkOff); }
+      if(type==='delete'){
+        // ลบจริงต้องสำเร็จจริง — server คืน deleted รายชื่อ (blocked ระหว่าง dry-run กับยิงจริงเกิดได้ถ้ามีคนรับเข้าแทรก)
+        if(!res.deleted || res.deleted.indexOf(payload.product_id)<0){
+          const msg=(res.blocked&&res.blocked[payload.product_id])||res.note||APP_TEXT.common.loadFail;
+          toast(tf(APP_TEXT.admin.deleteBlockedTpl,{msg}),false); adminCancelConfirm(); return;
+        }
+        toast(tf(APP_TEXT.admin.deleteOkTpl,{name:payload._name||payload.product_id}));
+      }
+      adminCancelConfirm();
+      admRefreshAfterChange();
+    })
+    .catch(e=>fail(e.message));
+}
+
+// หลังแก้/ลบ/void/unissue สำเร็จ — โหลดลิสต์แอดมินใหม่ + ให้แท็บอื่นที่ cache ไว้โหลดใหม่ครั้งถัดไป
+function admRefreshAfterChange(){
+  receiveTabInited=false;   // dropdown ชนิดในหน้ารับเข้า
+  stockTabInited=false;     // ยอดสต๊อก/รายชิ้น
+  expiryTabInited=false;    // ล็อตใกล้หมดอายุ (void เปลี่ยนยอด in_stock ได้)
+  initAdminTab();
+}
+
 /* ===== Init ===== */
 $('issueInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doIssue(); });
 $('pinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
@@ -698,7 +873,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // ถ้าตายจริง apiPost จะ forceRelogin เอง
   if(saved && saved.token){
     CURRENT=saved; enterApp();
-    apiPost({action:'checkToken'}).catch(()=>{});
+    apiPost({action:'checkToken'}).then(applyRoleFromAuth).catch(()=>{});
   } else if(saved){ clearSession(); }
   loadUsers();
 });
