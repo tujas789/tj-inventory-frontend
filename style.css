@@ -151,7 +151,7 @@
   /* ปุ่มหลักหน้า login — ใหญ่ขึ้นนิดให้สมศักดิ์ทางเข้า */
   #login .card button{ font-size:16px; letter-spacing:.3px; }
   .hidden{ display:none !important; }   /* !important: กัน #login{display:flex} ชนะ class นี้ */
-  #reader{ border:1px solid var(--hair); border-radius:var(--r-card); overflow:hidden; margin-top:12px; }
+  #reader, #readerRecv{ border:1px solid var(--hair); border-radius:var(--r-card); overflow:hidden; margin-top:12px; }   /* [T-063] readerRecv (แท็บรับเข้า) ใช้กรอบเดียวกัน */
   /* ─── Login overlay ─── */
   #login{ position:fixed; inset:0; background:var(--bg);
           background-image:radial-gradient(rgba(20,20,19,.045) 1px, transparent 1.4px);

@@ -89,6 +89,9 @@ function showTab(name){
 // คุมทุกทางเข้า (กล้อง/เครื่องยิง/พิมพ์มือ) เพราะทุกทางวิ่งผ่าน doIssue
 function normalizeBarcode(raw){
   const s=String(raw==null?'':raw).trim();
+  // [T-063] ฉลาก legacy format U-YYYYMMDD-NNNNNN (ก่อน ADR-0003) ต้อง match เป็น string ตรงตัว
+  //   ห้ามดึงเฉพาะเลข — ไม่งั้น U-20260603-000019 → 20260603000019 ยิงไม่เจอ (ขัด ADR-0003 §ผลที่ตามมา)
+  if(/^U-\d{8}-\d{6}$/i.test(s)) return s;
   const digits=s.replace(/\D/g,'');   // เก็บเฉพาะ 0-9
   return digits || s;                 // ถ้าไม่มีเลขเลย คืนค่าเดิม (กันพัง)
 }
@@ -96,6 +99,11 @@ function doIssue(code){
   const input=$('issueInput');
   const bc=normalizeBarcode(code||input.value);
   if(!bc||busy) return;
+  // [T-063] unit ใหม่ = เลข 8 หลักเป๊ะ (ADR-0003) — เลขล้วนที่ยาวผิด (เช่น vendor EAN 13 หลัก) เตือนทันที
+  //   ไม่ต้องเสีย round-trip ไปให้ server ปฏิเสธ ; legacy U-... ผ่าน normalizeBarcode มาแบบไม่ใช่เลขล้วนอยู่แล้ว
+  if(/^\d+$/.test(bc) && bc.length!==8){
+    toast(tf(APP_TEXT.issue.badFormatTpl,{code:bc}),false); input.select(); return;
+  }
   busy=true; $('issueBtn').disabled=true;
   apiPost({action:'issueForUI', unit_barcode:bc, user:CURRENT.user_id})
     .then(res=>{
@@ -160,6 +168,9 @@ function setCamBtn(cfg, open){
 // เปิดกล้องที่ readerId ด้วย cfg (SCAN_ISSUE/SCAN_VENDOR); พบ barcode → onCode(rawText)
 //   ⚠️ ไม่ normalize ที่นี่ — ให้ callback จัดการเอง (เบิกตัดเหลือเลขตาม ADR-0003 / รับเข้าส่งค่าดิบกัน vendor มีตัวอักษร)
 function startCamScan(readerId, cfg, onCode){
+  // [T-063] lib กล้องโหลดไม่สำเร็จ (เน็ตล่มตอนเปิดแอป) → toast บอกตรง ๆ แทนปล่อย ReferenceError
+  //   (banner ตอน DOMContentLoaded แค่เตือน ไม่ได้กันปุ่ม)
+  if(typeof Html5Qrcode==='undefined'){ toast(APP_TEXT.cam.libMissing,false); return; }
   // [T-043] toggle ให้ถูก: ต้องจำ reader ที่เปิดอยู่ "ก่อน" stopCam() เพราะ stopCam เคลียร์ camReaderId=null ทันที
   //   (บั๊กเดิม: เช็ค camReaderId หลัง stopCam → null เสมอ → กดปุ่มเดิมซ้ำกลายเป็นปิดแล้วเด้งเปิดใหม่)
   const wasOpen = camReaderId;
@@ -183,8 +194,11 @@ function startCamScan(readerId, cfg, onCode){
   // [review I5] บาง device cam.start() ค้าง (ไม่ resolve/reject) → ปุ่มค้างสถานะ "ปิดกล้อง" ตลอด
   //   Promise.race กับ timeout 15 วิ → เด้ง error + คืนสถานะปุ่ม (ถ้ากล้องมาทันก่อน timeout = ไม่กระทบ)
   // [T-062] fps 12→15 — เฟรมถี่ขึ้น จับติดง่ายขึ้นตอนมือสั่น (แลกแบตนิดหน่อย)
+  // [T-063] one-shot จริง: stopCam() เป็น async — frame ถัดไปอาจยิง callback ซ้ำก่อนกล้องหยุดสนิท
+  //   → callback แรกตั้ง consumed แล้วที่เหลือทิ้ง (กัน onCode ซ้ำ เช่น lookup รับเข้าเด้ง 2 รอบ)
+  let consumed=false;
   const startP = inst.start({facingMode:'environment'},{fps:15,qrbox:cfg.qrbox,videoConstraints:videoConstraints},
-    txt=>{ stopCam(); onCode(txt); },
+    txt=>{ if(consumed) return; consumed=true; stopCam(); onCode(txt); },
     ()=>{});
   startP.then(()=>{
     // [T-062] start มาเสร็จ "หลัง" ถูกยกเลิก (timeout/กดปิด/สลับ reader) → ดับ stream ทิ้ง กันกล้องติดค้าง
@@ -284,11 +298,16 @@ function renderProductDropdown(list){
     list.map(p=>`<option value="${esc(p.product_id)}">${esc(p.name)} (${esc(p.unit_of_measure)})</option>`).join('');
 }
 
+// [T-063] token กัน stale response: ยิง vendor A แล้วตามด้วย B เร็ว ๆ — response A อาจกลับมาทีหลัง
+//   แล้ว selectProduct ทับ B = เลือกชนิดผิดเงียบ ๆ → process เฉพาะ request ล่าสุด
+let vendorLookupSeq=0;
 function scanVendorBarcode(){
   const bc=$('recvVbcInput').value.trim();
   if(!bc) return;
+  const seq=++vendorLookupSeq;
   apiGet('lookupByVendorBarcode', {vendor_barcode:bc})
     .then(res=>{
+      if(seq!==vendorLookupSeq) return;   // มี request ใหม่กว่าแล้ว — ทิ้งผลรอบนี้
       if(!res||!res.ok){ toast(res.error||APP_TEXT.receive.searchFail,false); return; }
       $('recvVbcInput').value='';
       if(res.products.length===0){
@@ -302,7 +321,7 @@ function scanVendorBarcode(){
         toast(tf(APP_TEXT.receive.foundManyTpl,{n:res.products.length}));
       }
     })
-    .catch(e=>toast(tf(APP_TEXT.receive.searchFailTpl,{msg:e.message}),false));
+    .catch(e=>{ if(seq!==vendorLookupSeq) return; toast(tf(APP_TEXT.receive.searchFailTpl,{msg:e.message}),false); });
 }
 
 function selectProduct(prod){

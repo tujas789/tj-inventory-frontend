@@ -32,6 +32,7 @@ const APP_TEXT = {
     scannedTpl:  '📸 สแกนได้: {code} — กด “ตัดสต๊อก” เพื่อยืนยัน',
     failed:      'เบิกไม่สำเร็จ',
     failTpl:     '❌ {msg}',
+    badFormatTpl:'❌ {code} ไม่ใช่ unit_barcode (ต้องเป็นเลข 8 หลัก) — นี่อาจเป็น barcode กล่องผู้ขาย',   // [T-063]
   },
   recent: {
     title:     '🕘 เบิกล่าสุด (เซสชันนี้)',
@@ -45,6 +46,7 @@ const APP_TEXT = {
     torchOn:   '🔦 เปิดไฟฉาย',
     torchOff:  '🔦 ปิดไฟฉาย',
     torchFail: 'เปิดไฟฉายไม่ได้บนเครื่องนี้',
+    libMissing:'กล้องใช้ไม่ได้ — Library โหลดไม่สำเร็จ ลองรีเฟรชหน้าใหม่ (เช็คเน็ตก่อน)',   // [T-063]
   },
   common: {
     errorTpl: 'ผิดพลาด: {msg}',
