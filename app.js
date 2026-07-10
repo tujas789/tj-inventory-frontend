@@ -832,6 +832,8 @@ function admConfirmYes(){
         }
         toast(tf(APP_TEXT.admin.deleteOkTpl,{name:payload._name||payload.product_id}));
       }
+      // server ตอบ ok แต่มี warning = partial failure (เช่น เปลี่ยนสถานะแล้วแต่ log Transaction ไม่เข้า)
+      if(res.warning) toast(res.warning,false);
       adminCancelConfirm();
       admRefreshAfterChange();
     })
