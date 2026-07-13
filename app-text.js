@@ -104,6 +104,7 @@ const APP_TEXT = {
     needUom:            'กรุณาใส่หน่วยนับ',
     needProduct:        'กรุณาเลือกชนิดน้ำยา',
     failed:             'รับเข้าไม่สำเร็จ',
+    savingBtn:          '⏳ กำลังบันทึก… (ใช้เวลาหลายวินาที)',   // [T-070] แทนที่ text ปุ่มระหว่างรอ server
     okTpl:              '✅ รับเข้า {n} ชิ้น สำเร็จ',
     resultTitle:        '✅ รับเข้าสำเร็จ',
     resultMetaTpl:      'Lot {lot} &nbsp;·&nbsp; รับเข้า {n} ชิ้น &nbsp;·&nbsp; txn {txn}',

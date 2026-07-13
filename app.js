@@ -410,10 +410,12 @@ function doReceive(){
     payload.product_id=pid;
   }
 
-  busy=true; $('recvBtn').disabled=true;
+  // [T-070] server ใช้เวลาหลายวินาที (ธรรมชาติ GAS+Sheet) — เปลี่ยน text ปุ่มให้รู้ว่ากำลังทำงาน ไม่ใช่ค้าง
+  busy=true; $('recvBtn').disabled=true; $('recvBtn').textContent=APP_TEXT.receive.savingBtn;
+  const recvBtnDone=()=>{ busy=false; $('recvBtn').disabled=false; $('recvBtn').textContent=APP_TEXT.receive.submitBtn; };
   apiPost(Object.assign({action:'receiveForUI'}, payload))
     .then(res=>{
-      busy=false; $('recvBtn').disabled=false;
+      recvBtnDone();
       if(!res||!res.ok){ toast(res.error||APP_TEXT.receive.failed,false); return; }
       toast(tf(APP_TEXT.receive.okTpl,{n:res.unit_barcodes.length}));
       // เก็บข้อมูลฉลากฝั่ง client (ชื่อ/วันหมดอายุ/วันที่รับ/unit_barcode) — ครบไม่ต้องถาม server ซ้ำ
@@ -428,7 +430,7 @@ function doReceive(){
       };
       renderReceiveResult(res);
     })
-    .catch(e=>{ busy=false; $('recvBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
+    .catch(e=>{ recvBtnDone(); toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
 }
 
 function renderReceiveResult(res){
