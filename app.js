@@ -130,16 +130,18 @@ function doIssue(code){
   if(/^\d+$/.test(bc) && bc.length!==8){
     toast(tf(APP_TEXT.issue.badFormatTpl,{code:bc}),false); input.select(); return;
   }
-  busy=true; $('issueBtn').disabled=true;
+  // [T-071] server ใช้เวลาหลายวินาที (ธรรมชาติ GAS+Sheet) — เปลี่ยน text ปุ่มให้รู้ว่ากำลังทำงาน ไม่ใช่ค้าง (pattern เดียวกับ recvBtnDone)
+  busy=true; $('issueBtn').disabled=true; $('issueBtn').textContent=APP_TEXT.issue.savingBtn;
+  const issueBtnDone=()=>{ busy=false; $('issueBtn').disabled=false; $('issueBtn').textContent=APP_TEXT.issue.submitBtn; };
   apiPost({action:'issueForUI', unit_barcode:bc, user:CURRENT.user_id})
     .then(res=>{
-      busy=false; $('issueBtn').disabled=false;
+      issueBtnDone();
       if(!res||!res.ok){ toast(tf(APP_TEXT.issue.failTpl,{msg:(res&&res.error)||APP_TEXT.issue.failed}),false); input.select(); return; }
       toast(tf(APP_TEXT.issue.okTpl,{name:res.product_name||res.unit_barcode}));
       recent.unshift(Object.assign({at:Date.now()},res)); saveRecent();   // [review I2] จำเวลา + persist กัน refresh
       renderRecent(); input.value=''; input.focus();
     })
-    .catch(e=>{ busy=false; $('issueBtn').disabled=false; toast(tf(APP_TEXT.issue.failTpl,{msg:tf(APP_TEXT.common.errorTpl,{msg:e.message})}),false); input.select(); });
+    .catch(e=>{ issueBtnDone(); toast(tf(APP_TEXT.issue.failTpl,{msg:tf(APP_TEXT.common.errorTpl,{msg:e.message})}),false); input.select(); });
 }
 function renderRecent(){
   if(!recent.length){ $('recent').innerHTML=`<div class="empty">${APP_TEXT.recent.empty}</div>`; return; }

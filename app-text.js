@@ -26,6 +26,7 @@ const APP_TEXT = {
     title:       '🫗 เบิกจ่าย — ยิง barcode ตัดสต๊อกทันที',
     placeholder: 'ยิง / พิมพ์ unit_barcode แล้ว Enter',
     submitBtn:   'ตัดสต๊อก (Enter)',
+    savingBtn:   '⏳ กำลังตัดสต๊อก… รอสักครู่',   // [T-071] แทนที่ text ปุ่มระหว่างรอ server (คู่กับ receive.savingBtn)
     camBtn:      '📸 ใช้กล้อง',
     camBtnClose: '✖ ปิดกล้อง',
     okTpl:       '✅ ตัดสต๊อก: {name}',
