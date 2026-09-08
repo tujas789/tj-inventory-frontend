@@ -200,6 +200,28 @@ const DEMO = (function(){
       if(dryRun){ report.will_delete=[pid]; } else { products.splice(idx,1); report.deleted.push(pid); }
       return report;
     },
+    // [T-073] จำลอง purgeProduct ให้ครบ guard เดียวกับ backend — ใช้ verify UI ได้โดยไม่แตะข้อมูลจริง
+    purgeProduct(p){
+      const pid=String(p.product_id||'').trim();
+      const dryRun=(p.confirm!=='PURGE');
+      const prod=products.find(x=>x.product_id===pid);
+      if(!pid) return {ok:false, error:'ไม่ระบุ product_id'};
+      if(!dryRun && !String(p.reason||'').trim()) return {ok:false, error:'ต้องระบุเหตุผล — จะถูกบันทึกลงประวัติ (Transaction)'};
+      if(!prod) return {ok:false, error:'ไม่พบชนิดนี้ในระบบ: '+pid};
+      const myLots=lots.filter(l=>l.product_id===pid);
+      const lotIds=myLots.map(l=>l.lot_id);
+      const myUnits=units.filter(u=>u.product_id===pid || lotIds.indexOf(u.lot_id)>=0);
+      const counts={lots:myLots.length, units:myUnits.length,
+        in_stock:myUnits.filter(u=>u.status==='in_stock').length,
+        issued:myUnits.filter(u=>u.status==='issued').length,
+        void:myUnits.filter(u=>u.status==='void').length};
+      if(counts.issued>0) return {ok:false, error:'ชนิดนี้เคยถูกเบิกไปแล้ว '+counts.issued+' กล่อง — ลบไม่ได้ (ประวัติการเบิกต้องอยู่ครบ) · ใช้ "ปิดใช้งาน" แทน'};
+      if(dryRun) return {ok:true, dryRun:true, product_id:pid, name:prod.name, counts};
+      for(let i=units.length-1;i>=0;i--) if(myUnits.indexOf(units[i])>=0) units.splice(i,1);
+      for(let i=lots.length-1;i>=0;i--) if(myLots.indexOf(lots[i])>=0) lots.splice(i,1);
+      products.splice(products.indexOf(prod),1);
+      return {ok:true, dryRun:false, product_id:pid, name:prod.name, counts, txn_id:'T'+String(++seqTxn).padStart(8,'0')};
+    },
     voidUnit(p){
       if(!String(p.reason||'').trim()) return {ok:false, error:'ต้องระบุเหตุผล — จะถูกบันทึกลงประวัติ (Transaction)'};
       const u=units.find(x=>x.unit_barcode===String(p.unit_barcode).trim());

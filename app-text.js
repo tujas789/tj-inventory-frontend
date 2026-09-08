@@ -169,6 +169,11 @@ const APP_TEXT = {
     deactivateBtn:      '🚫 ปิดใช้งาน',
     activateBtn:        '✅ เปิดใช้งาน',
     deleteBtn:          '🗑️ ลบถาวร',
+    purgeBtn:           '🧹 ล้างทั้งหมด',
+    purgeReasonLabel:   'เหตุผลที่ล้างทั้งหมด * (บันทึกลงประวัติ)',
+    purgeReasonPh:      'เช่น คีย์ผิดตั้งแต่ต้น / สร้างชนิดซ้ำ',
+    purgeNeedReason:    'ต้องระบุเหตุผลก่อนล้างทั้งหมด — จะถูกบันทึกลงประวัติ',
+    purgeNothing:       'ชนิดนี้ไม่มีล็อต/กล่องเลย — ใช้ปุ่ม 🗑️ ลบถาวร ได้เลย',
     needName:           'กรุณาใส่ชื่อน้ำยา',
     needUom:            'กรุณาใส่หน่วยนับ',
     needBarcode:        'ใส่ unit_barcode ก่อน',
@@ -191,6 +196,10 @@ const APP_TEXT = {
     confirmDeactivateTpl:'ปิดใช้งาน <b>{name}</b> — จะหายจากหน้ารับเข้า/สต๊อก (เปิดกลับได้ทีหลัง)',
     confirmActivateTpl: 'เปิดใช้งาน <b>{name}</b> กลับมาใช้ตามปกติ',
     confirmDeleteTpl:   '⚠️ ลบ <b>{name}</b> ถาวร — กู้คืนไม่ได้',
+    confirmPurgeTpl:    '⚠️ ล้าง <b>{name}</b> ทั้งหมด — <b>กู้คืนไม่ได้</b><br>'+
+                        'จะลบ: ล็อต <b>{lots}</b> · กล่อง <b>{units}</b> (อยู่ในสต๊อก {inStock} · ยกเลิกแล้ว {voided})<br>'+
+                        'เหตุผล: {reason}<br><span class="muted">ฉลากที่ปริ้นไปแล้วของชนิดนี้จะยิงไม่เจอ — ทิ้งได้เลย</span>',
+    purgeOkTpl:         '✅ ล้าง {name} แล้ว (ล็อต {lots} · กล่อง {units})',
     voidOkTpl:          '✅ ยกเลิกกล่อง {code} แล้ว',
     unissueOkTpl:       '✅ คืนสต๊อก {code} แล้ว',
     toggleOkOn:         '✅ เปิดใช้งานแล้ว',

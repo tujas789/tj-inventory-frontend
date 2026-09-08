@@ -735,6 +735,7 @@ function onAdminProductChange(){
   $('admUom').value=p.unit_of_measure||'';
   $('admVbc').value=p.vendor_barcode||'';
   $('admToggleActiveBtn').textContent = p.is_active===false ? APP_TEXT.admin.activateBtn : APP_TEXT.admin.deactivateBtn;
+  $('admPurgeReason').value='';   // [T-073] เหตุผลผูกกับชนิดที่เลือก — เปลี่ยนชนิดต้องพิมพ์ใหม่ กัน reason ค้างจากตัวก่อน
 }
 
 // แก้ Product = ไม่ destructive → ไม่ต้องผ่านกล่องยืนยัน (validate แล้วยิงเลย)
@@ -796,6 +797,28 @@ function admDeleteProduct(){
     .catch(e=>{ busy=false; $('admDeleteBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
 }
 
+// [T-073] ล้างทั้งชนิด: step 1 = dry-run ที่ server (เคยเบิก → server ปฏิเสธพร้อมบอกจำนวน)
+//   step 2 = ยืนยันแล้วยิง confirm:'PURGE' · เหตุผลบังคับตั้งแต่ step 1 (จะได้ไม่เสีย round-trip ฟรี)
+function admPurgeProduct(){
+  const p=adminProducts.find(x=>x.product_id===$('admProductSel').value);
+  if(!p||busy) return;
+  const reason=$('admPurgeReason').value.trim();
+  if(!reason){ toast(APP_TEXT.admin.purgeNeedReason,false); $('admPurgeReason').focus(); return; }
+  busy=true; $('admPurgeBtn').disabled=true;
+  apiPost({action:'purgeProduct', product_id:p.product_id, reason})
+    .then(res=>{
+      busy=false; $('admPurgeBtn').disabled=false;
+      if(!res||!res.ok){ toast(tf(APP_TEXT.admin.failTpl,{msg:(res&&res.error)||APP_TEXT.common.loadFail}),false); return; }
+      const c=res.counts||{};
+      // ไม่มีล็อต/กล่องเลย → ปุ่มลบถาวรเดิมทำงานได้ ไม่ต้องใช้ทางที่แรงกว่า
+      if(!c.lots && !c.units){ toast(APP_TEXT.admin.purgeNothing,false); return; }
+      admAsk('purge', tf(APP_TEXT.admin.confirmPurgeTpl,{
+        name:esc(p.name), lots:c.lots, units:c.units, inStock:c.in_stock, voided:c.void, reason:esc(reason)
+      }), {product_id:p.product_id, reason, confirm:'PURGE', _name:p.name});
+    })
+    .catch(e=>{ busy=false; $('admPurgeBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
+}
+
 // void/unissue: validate barcode (reuse normalizeBarcode + กติกา 8 หลัก ADR-0003) + เหตุผลบังคับ → กล่องยืนยัน
 function admUnitAction(type, bcInputId, reasonInputId, confirmTpl){
   const bc=normalizeBarcode($(bcInputId).value);
@@ -821,6 +844,7 @@ function admConfirmYes(){
   else if(type==='unissue') req=apiPost({action:'unissueUnit', unit_barcode:payload.unit_barcode, reason:payload.reason, user:CURRENT.user_id});
   else if(type==='toggleActive') req=apiPost({action:'setProductActive', product_id:payload.product_id, is_active:payload.is_active});
   else if(type==='delete')  req=apiPost({action:'deleteProductAdmin', product_id:payload.product_id, confirm:payload.confirm});
+  else if(type==='purge')   req=apiPost({action:'purgeProduct', product_id:payload.product_id, reason:payload.reason, confirm:payload.confirm, user:CURRENT.user_id});
   else { done(); return; }
   req.then(res=>{
       done();
@@ -828,6 +852,13 @@ function admConfirmYes(){
       if(type==='void'){ toast(tf(APP_TEXT.admin.voidOkTpl,{code:payload.unit_barcode})); $('admVoidBc').value=''; $('admVoidReason').value=''; }
       if(type==='unissue'){ toast(tf(APP_TEXT.admin.unissueOkTpl,{code:payload.unit_barcode})); $('admUnissueBc').value=''; $('admUnissueReason').value=''; }
       if(type==='toggleActive'){ toast(payload.is_active?APP_TEXT.admin.toggleOkOn:APP_TEXT.admin.toggleOkOff); }
+      if(type==='purge'){
+        // ยิงจริงแล้ว server ยัง block ได้ (มีคนเบิกแทรกระหว่างยืนยัน — เช็คใน lock เดียวกับตอนลบ)
+        if(res.dryRun){ toast(tf(APP_TEXT.admin.failTpl,{msg:res.note||APP_TEXT.common.loadFail}),false); adminCancelConfirm(); return; }
+        const c=res.counts||{};
+        toast(tf(APP_TEXT.admin.purgeOkTpl,{name:payload._name||payload.product_id, lots:c.lots, units:c.units}));
+        $('admPurgeReason').value='';
+      }
       if(type==='delete'){
         // ลบจริงต้องสำเร็จจริง — server คืน deleted รายชื่อ (blocked ระหว่าง dry-run กับยิงจริงเกิดได้ถ้ามีคนรับเข้าแทรก)
         if(!res.deleted || res.deleted.indexOf(payload.product_id)<0){
