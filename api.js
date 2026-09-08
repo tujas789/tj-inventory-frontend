@@ -29,16 +29,59 @@ const IS_DEMO = /[?&]demo(=|&|$)/.test(location.search) || /PASTE_EXEC_URL/.test
 // [review C2] server ตอบไม่ใช่ 2xx (500/502 = หน้า HTML error) → r.json() throw message งงๆ
 //   เช็ค r.ok ก่อน → error บอกชัดว่า server พัง ไม่ใช่ข้อมูลพัง
 const _httpOk = r => { if(!r.ok) throw new Error('เซิร์ฟเวอร์ขัดข้อง (HTTP '+r.status+')'); return r.json(); };
+
+/* [T-074] timeout — หนี้จาก T-071: เดิม fetch ไม่มีเพดานเวลา · เน็ตค้าง (มือถือหลุด wifi กลางคัน)
+   = promise ไม่ resolve ตลอดกาล → busy ค้าง true ปุ่มค้าง "กำลัง…" ถาวร แก้ได้ทางเดียวคือ refresh
+
+   ค่าที่ตั้ง (อิงตัวเลขจริงจาก BENCHMARK-t070 ไม่ใช่เดา):
+     GET  30 วิ — read จริง cold 6.6 วิ / warm 3.6 วิ → เผื่อ 4-8 เท่า
+     POST 60 วิ — write จริง 8.4 วิ + backend รอ LockService ได้ถึง 30 วิ (tryLock 30000)
+                  ตัดที่ 45 วิจะฆ่า request ที่ "กำลังรอคิว lock อยู่ดีๆ" ทั้งที่อีกแป๊บเดียวจะสำเร็จ
+   ⚠️ ตั้งสั้นกว่านี้ = อันตรายกว่าค้าง เพราะ timeout ไม่ได้ยกเลิกงานฝั่ง server —
+      server ยังเขียนต่อจนจบ แต่ผู้ใช้เห็นว่า "ไม่สำเร็จ" (false negative) */
+const API_TIMEOUT_GET = 30000;
+const API_TIMEOUT_POST = 60000;
+
+/* action ที่ "ยิงซ้ำแล้วเกิดของซ้ำจริง" — ต้องเตือนไม่ให้กดซ้ำมั่วตอน timeout
+   ที่เหลือ (issue/void/unissue/purge/updateProduct/setProductActive) ยิงซ้ำปลอดภัยโดยธรรมชาติ:
+   รอบสองจะชนสถานะที่เปลี่ยนไปแล้วแล้ว error เอง (เช่น "กล่องนี้ถูกเบิกไปแล้ว") ไม่เกิดของซ้ำ */
+const REPEAT_UNSAFE = { receive:1, receiveForUI:1, createLot:1, createProduct:1 };
+
+const _t = (key, fallback) => {
+  try { return (APP_TEXT && APP_TEXT.common && APP_TEXT.common[key]) || fallback; }
+  catch(e){ return fallback; }
+};
+
+// fetch + เพดานเวลา · AbortError → ข้อความที่บอก "ต้องทำอะไรต่อ" ไม่ใช่แค่ "ล้มเหลว"
+function _fetchTimeout(url, opts, ms, action){
+  // AbortController มีทุกเบราว์เซอร์ที่ระบบรองรับ (iOS 12.2+/Chrome 66+) — ไม่มีก็ยังทำงานได้แค่ไม่มี timeout
+  if(typeof AbortController==='undefined') return fetch(url, opts).then(_httpOk);
+  const ac=new AbortController();
+  const timer=setTimeout(()=>ac.abort(), ms);
+  return fetch(url, Object.assign({signal:ac.signal}, opts||{}))
+    .then(_httpOk)
+    .catch(e=>{
+      if(e && e.name==='AbortError'){
+        const sec=Math.max(1, Math.round(ms/1000));   // กันปัดลงเหลือ 0 ตอนตั้งค่าสั้นๆ (เช่นตอนเทส)
+        throw new Error(REPEAT_UNSAFE[action]
+          ? tf(_t('timeoutUnsafeTpl','หมดเวลารอ {sec} วินาที — ⚠️ อย่าเพิ่งกดซ้ำ! ระบบอาจบันทึกไปแล้ว กรุณาเช็คหน้าสต๊อกก่อน'),{sec})
+          : tf(_t('timeoutTpl','หมดเวลารอ {sec} วินาที (เน็ตช้า/หลุด) — ลองใหม่อีกครั้งได้'),{sec}));
+      }
+      throw e;
+    })
+    .then(res=>{ clearTimeout(timer); return res; }, e=>{ clearTimeout(timer); throw e; });
+}
+
 function apiGet(action, params){
   if(IS_DEMO) return DEMO.call(action, params||{});
   const q=new URLSearchParams(Object.assign({action}, params||{}));
-  return fetch(API_URL+'?'+q.toString()).then(_httpOk);
+  return _fetchTimeout(API_URL+'?'+q.toString(), null, API_TIMEOUT_GET, action);
 }
 function apiPost(payload){
   if(IS_DEMO) return DEMO.call(payload.action, payload);
   // [T-014] แนบ session token อัตโนมัติ + token ตาย (auth:false) → เด้งกลับหน้า login จุดเดียว
   if(CURRENT && CURRENT.token && !payload.token) payload.token = CURRENT.token;
-  return fetch(API_URL, {method:'POST', body:JSON.stringify(payload)}).then(_httpOk)
+  return _fetchTimeout(API_URL, {method:'POST', body:JSON.stringify(payload)}, API_TIMEOUT_POST, payload.action)
     .then(res=>{ if(res && res.auth===false) forceRelogin(); return res; });
 }
 
