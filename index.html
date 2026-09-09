@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Thai+Looped:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css?v=20260614">
-<link rel="stylesheet" href="style.css?v=20260706a">
+<link rel="stylesheet" href="style.css?v=20260909">
 </head>
 <body>
 
@@ -98,8 +98,20 @@
         <div id="readerRecv" class="hidden"></div>
         <button id="torchBtnRecv" class="ghost mt8 hidden" onclick="toggleTorch()">🔦 เปิดไฟฉาย</button>
       </div>
-      <label data-text="receive.pickLabel">หรือเลือกจากรายการ</label>
-      <select id="recvProductSel">
+      <label data-text="receive.pickLabel" for="recvProductInput">หรือเลือกจากรายการ</label>
+      <!-- [T-075] combobox: พิมพ์ค้นหา + เลือกจากลิสต์ ในช่องเดียว
+           select ด้านล่างยังอยู่ (ซ่อน) = ตัวเก็บ product_id จริง — โค้ดเดิมทุกจุดที่อ่าน
+           recvProductSel.value ยังทำงานเหมือนเดิม (doReceive/selectProduct/renderLabelSample) -->
+      <div class="combo" id="recvProductCombo">
+        <input id="recvProductInput" autocomplete="off" role="combobox" aria-expanded="false"
+               aria-controls="recvProductList" aria-autocomplete="list" aria-haspopup="listbox"
+               data-text-placeholder="receive.comboPlaceholder" placeholder="พิมพ์ชื่อ/รหัส เพื่อค้นหา — หรือแตะเพื่อดูทั้งหมด">
+        <button type="button" class="combo-clear hidden" id="recvProductClear"
+                onclick="comboClear()" data-text-aria="receive.comboClearAria" aria-label="ล้างการเลือก">✕</button>
+        <span class="combo-chev" aria-hidden="true">▾</span>
+        <div class="combo-list hidden" id="recvProductList" role="listbox"></div>
+      </div>
+      <select id="recvProductSel" class="hidden" tabindex="-1" aria-hidden="true">
         <option value="" data-text="receive.loadingProducts">— กำลังโหลด... —</option>
       </select>
       <button class="ghost mt10" onclick="toggleNewProduct()" data-text="receive.newProductBtn">➕ สร้างชนิดใหม่</button>
@@ -237,9 +249,9 @@
 <div id="printArea"></div>
 
 <!-- T-030: JS แตกเป็นไฟล์ — ลำดับสำคัญ (app-text -> api -> app) และต้องอยู่ท้าย body (มี addEventListener นอก DOMContentLoaded) -->
-<script src="app-text.js?v=20260908b"></script>
+<script src="app-text.js?v=20260909"></script>
 <script src="api.js?v=20260908b"></script>
 <script src="labels.js?v=20260613"></script>
-<script src="app.js?v=20260908"></script>
+<script src="app.js?v=20260909"></script>
 </body>
 </html>

@@ -321,10 +321,162 @@ function initReceiveTab(){
 
 function renderProductDropdown(list){
   const sel=$('recvProductSel');
-  if(!list||!list.length){ sel.innerHTML=`<option value="">${APP_TEXT.receive.noProducts}</option>`; return; }
+  // [T-075] combobox ใช้ list ชุดเดียวกับ select (select = ตัวเก็บค่าจริง / combo = หน้าบ้าน)
+  comboItems = (list||[]).slice();
+  if(!list||!list.length){ sel.innerHTML=`<option value="">${APP_TEXT.receive.noProducts}</option>`; comboSyncText(); return; }
   sel.innerHTML=`<option value="">${APP_TEXT.receive.pickProduct}</option>`+
     list.map(p=>`<option value="${esc(p.product_id)}">${esc(p.name)} (${esc(p.unit_of_measure)})</option>`).join('');
+  comboSyncText();   // เลือกไว้ก่อนหน้า (เช่นสแกน vendor barcode แล้ว) → ข้อความในช่องต้องตามมาด้วย
 }
+
+/* ===== [T-075] combobox เลือกชนิด — พิมพ์ค้นหา + เลือกจากลิสต์ ในช่องเดียว =====
+   ทำไมไม่ใช้ <datalist> (ทางที่โค้ดสั้นกว่ามาก): ชื่อชนิดซ้ำกันได้จริงในชีต
+   (Total Bilirubin = P0043/P0044/P0045) — datalist จับคู่ด้วย "ข้อความ" อย่างเดียว
+   → แยกไม่ออกว่าหมายถึงตัวไหน = เสี่ยงรับเข้าผิดชนิดแบบเงียบ ๆ ซึ่งแย่กว่าเลื่อนหานาน
+
+   ดีไซน์: <select id="recvProductSel"> เดิมยังอยู่ (ซ่อน) = ตัวเก็บ product_id จริง
+   → doReceive / selectProduct / renderLabelSample / listener change ทำงานเหมือนเดิมทุกจุด
+   combobox เป็นแค่ "หน้าบ้าน" ที่เขียนค่าลง select แล้ว dispatch change */
+let comboItems = [];    // รายการชนิดที่ค้นได้ (sync กับ options ใน select)
+let comboFiltered = [];
+let comboActive = -1;   // index ใน comboFiltered ที่ไฮไลต์ด้วยคีย์บอร์ด (-1 = ยังไม่เลือก)
+// pid ที่เลือกไว้ "ก่อนเริ่มพิมพ์" — ปิดลิสต์โดยไม่เลือกอะไร = คืนค่านี้กลับ
+// (เผลอพิมพ์แล้วแตะที่อื่น ไม่ควรทำให้ชนิดที่เลือกไว้หายจนต้องเริ่มใหม่)
+let comboLastPid = '';
+
+const _comboEl = () => ({ inp: $('recvProductInput'), list: $('recvProductList'), sel: $('recvProductSel'), clr: $('recvProductClear') });
+
+// ไฮไลต์คำค้นแบบปลอดภัย: esc() ทีละท่อนแล้วค่อยประกบ <mark> (ห้าม esc ทีหลัง — tag จะโดน escape ไปด้วย)
+function comboHl(text, q){
+  const s = String(text == null ? '' : text);
+  if(!q) return esc(s);
+  const i = s.toLowerCase().indexOf(q.toLowerCase());
+  if(i < 0) return esc(s);
+  return esc(s.slice(0, i)) + '<mark>' + esc(s.slice(i, i + q.length)) + '</mark>' + esc(s.slice(i + q.length));
+}
+
+// ค้นจาก ชื่อ + รหัส + หน่วยนับ + barcode ผู้ขาย · หลายคำ = ต้องเจอครบทุกคำ (พิมพ์ "bili 45" ก็เจอ)
+function comboMatch(list, q){
+  const tokens = String(q || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if(!tokens.length) return list.slice();
+  return list.filter(p => {
+    const hay = (String(p.name||'') + ' ' + String(p.product_id||'') + ' ' +
+                 String(p.unit_of_measure||'') + ' ' + String(p.vendor_barcode||'')).toLowerCase();
+    return tokens.every(tk => hay.indexOf(tk) >= 0);
+  });
+}
+
+function comboRender(q){
+  const { list } = _comboEl();
+  if(!comboFiltered.length){
+    list.innerHTML = `<div class="combo-empty">${esc(tf(APP_TEXT.receive.comboEmptyTpl, {q: String(q||'')}))}</div>`;
+    return;
+  }
+  // รหัสโชว์เสมอ ไม่ใช่เฉพาะตอนค้น — เป็นตัวเดียวที่แยกชนิดชื่อซ้ำออกจากกันได้
+  list.innerHTML = comboFiltered.map((p, i) => `
+    <div class="combo-opt${i === comboActive ? ' active' : ''}" role="option" id="combo-opt-${i}"
+         aria-selected="${i === comboActive}" data-idx="${i}" onclick="comboPick(${i})">
+      <span class="co-name">${comboHl(p.name, q)}${p.unit_of_measure ? ' <span class="co-id">(' + esc(p.unit_of_measure) + ')</span>' : ''}</span>
+      <span class="co-id">${comboHl(p.product_id, q)}</span>
+    </div>`).join('');
+}
+
+function comboOpen(){
+  const { inp, list, clr } = _comboEl();
+  const q = inp.value.trim();
+  // ข้อความในช่อง = ชื่อที่เลือกไว้แล้ว → เปิดมาให้เห็นทั้งหมด (ไม่ใช่กรองเหลือตัวเดียว)
+  comboFiltered = comboMatch(comboItems, _comboEl().sel.value ? '' : q);
+  comboActive = -1;
+  comboRender(_comboEl().sel.value ? '' : q);
+  list.classList.remove('hidden');
+  inp.setAttribute('aria-expanded', 'true');
+  clr.classList.toggle('hidden', !inp.value);
+}
+
+function comboClose(){
+  const { inp, list } = _comboEl();
+  list.classList.add('hidden');
+  inp.setAttribute('aria-expanded', 'false');
+  inp.removeAttribute('aria-activedescendant');
+  comboActive = -1;
+}
+
+// ★ invariant: ข้อความในช่องต้องตรงกับ product_id ที่เลือกอยู่เสมอ
+//   กันสภาพ "พิมพ์ค้างไว้แต่ไม่ได้เลือก" ที่ทำให้เข้าใจผิดว่ากำลังรับเข้าชนิดที่พิมพ์
+function comboSyncText(){
+  const { inp, sel, clr } = _comboEl();
+  const p = comboItems.find(x => x.product_id === sel.value);
+  inp.value = p ? p.name + (p.unit_of_measure ? ' (' + p.unit_of_measure + ')' : '') : '';
+  clr.classList.toggle('hidden', !inp.value);
+}
+
+// ปิดลิสต์โดยไม่ได้เลือกอะไร → คืน pid เดิม + ข้อความให้ตรงกัน
+function comboRevert(){
+  const { sel } = _comboEl();
+  if(!sel.value && comboLastPid && comboItems.some(p => p.product_id === comboLastPid)) sel.value = comboLastPid;
+  comboSyncText();
+  renderLabelSample();
+}
+
+function comboPick(i){
+  const p = comboFiltered[i];
+  if(!p) return;
+  const { sel } = _comboEl();
+  sel.value = p.product_id;
+  comboLastPid = p.product_id;
+  hideNewProductForm();          // เลือกจากรายการ = ไม่ใช่ชนิดใหม่ (flow เดียวกับ selectProduct)
+  comboSyncText();
+  comboClose();
+  renderLabelSample();           // [T-033] ชื่อบนตัวอย่างฉลากเปลี่ยนตาม
+}
+
+function comboClear(){
+  const { inp, sel } = _comboEl();
+  sel.value = '';
+  comboLastPid = '';             // กดล้างเอง = ตั้งใจยกเลิกจริง ไม่ต้องคืนค่าเดิม
+  inp.value = '';
+  renderLabelSample();
+  comboOpen();
+  inp.focus();
+}
+
+function comboInput(){
+  const { inp, sel, clr } = _comboEl();
+  if(sel.value) comboLastPid = sel.value;   // จำไว้ก่อน เผื่อผู้ใช้เปลี่ยนใจแล้วแตะออก
+  // เริ่มพิมพ์ = ยกเลิกตัวที่เลือกไว้ทันที · ห้ามคาไว้เด็ดขาด ไม่งั้นข้อความที่เห็นกับชนิดที่จะรับเข้า
+  // ไม่ตรงกัน = รับเข้าผิดชนิดแบบเงียบ ๆ (ปัญหาเดียวกับที่ทำให้ไม่ใช้ <datalist>)
+  sel.value = '';
+  const q = inp.value.trim();
+  comboFiltered = comboMatch(comboItems, q);
+  comboActive = comboFiltered.length === 1 ? 0 : -1;   // เหลือตัวเดียว = พร้อมกด Enter ได้เลย
+  comboRender(q);
+  _comboEl().list.classList.remove('hidden');
+  inp.setAttribute('aria-expanded', 'true');
+  clr.classList.toggle('hidden', !inp.value);
+  renderLabelSample();
+}
+
+function comboKey(e){
+  const { list } = _comboEl();
+  const open = !list.classList.contains('hidden');
+  if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+    e.preventDefault();
+    if(!open){ comboOpen(); return; }
+    if(!comboFiltered.length) return;
+    comboActive = e.key === 'ArrowDown'
+      ? (comboActive + 1) % comboFiltered.length
+      : (comboActive <= 0 ? comboFiltered.length - 1 : comboActive - 1);
+    comboRender(_comboEl().sel.value ? '' : _comboEl().inp.value.trim());
+    const el = $('combo-opt-' + comboActive);
+    if(el){ el.scrollIntoView({block:'nearest'}); _comboEl().inp.setAttribute('aria-activedescendant', el.id); }
+  } else if(e.key === 'Enter'){
+    if(open && comboActive >= 0){ e.preventDefault(); comboPick(comboActive); }
+    else if(open && comboFiltered.length === 1){ e.preventDefault(); comboPick(0); }
+  } else if(e.key === 'Escape'){
+    if(open){ e.preventDefault(); comboClose(); comboRevert(); }
+  }
+}
+
 
 // [T-063] token กัน stale response: ยิง vendor A แล้วตามด้วย B เร็ว ๆ — response A อาจกลับมาทีหลัง
 //   แล้ว selectProduct ทับ B = เลือกชนิดผิดเงียบ ๆ → process เฉพาะ request ล่าสุด
@@ -364,6 +516,7 @@ function selectProduct(prod){
     sel.appendChild(opt); sel.value=prod.product_id;
   }
   hideNewProductForm();
+  comboSyncText();       // [T-075] สแกน vendor barcode เจอ → ช่องค้นหาต้องโชว์ชื่อที่เลือกด้วย
   renderLabelSample();   // [T-033]
 }
 
@@ -380,6 +533,9 @@ function hideNewProductForm(){
 function toggleNewProduct(){
   if($('newProductForm').classList.contains('hidden')){
     $('recvProductSel').value='';
+    comboLastPid='';     // [T-075] สลับไปโหมด "สร้างชนิดใหม่" = ตั้งใจทิ้งของที่เลือกไว้
+    comboSyncText();     // ล้างชื่อในช่องค้นหา ไม่ให้ค้างขัดกับโหมดใหม่
+    comboClose();
     showNewProductForm($('recvVbcInput').value.trim());
   } else {
     hideNewProductForm();
@@ -408,7 +564,13 @@ function doReceive(){
     payload.new_product={name, unit_of_measure:uom, vendor_barcode:$('newProductVbc').value.trim()};
   } else {
     const pid=$('recvProductSel').value;
-    if(!pid){ toast(APP_TEXT.receive.needProduct,false); return; }
+    if(!pid){
+      // [T-075] แยก 2 เคสให้ผู้ใช้รู้ว่าต้องทำอะไรต่อ: พิมพ์ค้างอยู่ (ยังไม่ได้แตะเลือก) vs ยังไม่ได้กรอกเลย
+      const typed=$('recvProductInput').value.trim();
+      toast(typed?APP_TEXT.receive.needPickFromList:APP_TEXT.receive.needProduct,false);
+      $('recvProductInput').focus();
+      return;
+    }
     payload.product_id=pid;
   }
 
@@ -888,6 +1050,22 @@ $('issueInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doIssue(); 
 $('pinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 $('recvVbcInput').addEventListener('keydown', e=>{ if(e.key==='Enter') scanVendorBarcode(); });
 // [T-033] ตัวอย่างฉลากสด — อัปเดตทุกครั้งที่ข้อมูลบนฉลากเปลี่ยน (ชนิด/ชื่อใหม่/วันหมดอายุ/จำนวน)
+// [T-075] combobox events — ผูกที่นี่แทน inline onclick เพื่อคุม focus/blur ครบทาง
+$('recvProductInput').addEventListener('input', comboInput);
+$('recvProductInput').addEventListener('keydown', comboKey);
+$('recvProductInput').addEventListener('focus', comboOpen);
+$('recvProductInput').addEventListener('click', comboOpen);
+// mousedown บนลิสต์ต้องไม่ทำให้ input blur — ไม่งั้นลิสต์ปิดก่อน click จะทำงาน (แตะบนมือถือก็วิ่งผ่านทางนี้)
+$('recvProductList').addEventListener('mousedown', e=>e.preventDefault());
+$('recvProductClear').addEventListener('mousedown', e=>e.preventDefault());
+// คลิกที่อื่น = ปิดลิสต์ + คืนข้อความให้ตรงกับชนิดที่เลือกจริง (กันข้อความค้างที่ยังไม่ได้เลือก)
+document.addEventListener('click', e=>{
+  const box=$('recvProductCombo');
+  if(box && !box.contains(e.target) && !$('recvProductList').classList.contains('hidden')){
+    comboClose(); comboRevert();
+  }
+});
+
 ['recvProductSel','recvExpiry','recvQty','newProductName'].forEach(id=>{
   $(id).addEventListener('input', renderLabelSample);
   $(id).addEventListener('change', renderLabelSample);

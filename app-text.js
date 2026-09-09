@@ -78,6 +78,11 @@ const APP_TEXT = {
     camBtnClose:        '✖ ปิดกล้อง',
     scannedTpl:         '📸 สแกนได้: {code} — กำลังค้นหาชนิด...',
     pickLabel:          'หรือเลือกจากรายการ',
+    // [T-075] combobox — พิมพ์ค้นหา + เลือกจากลิสต์ ในช่องเดียว
+    comboPlaceholder:   'พิมพ์ชื่อ/รหัส เพื่อค้นหา — หรือแตะเพื่อดูทั้งหมด',
+    comboClearAria:     'ล้างการเลือก',
+    comboEmptyTpl:      'ไม่พบ "{q}" — ถ้าเป็นของใหม่ กด ➕ สร้างชนิดใหม่ ด้านล่าง',
+    comboCountTpl:      'พบ {n} ชนิด',
     loadingProducts:    '— กำลังโหลด... —',
     noProducts:         '— ยังไม่มีชนิดน้ำยา —',
     pickProduct:        '— เลือกชนิด —',
@@ -107,6 +112,7 @@ const APP_TEXT = {
     needName:           'กรุณาใส่ชื่อน้ำยา',
     needUom:            'กรุณาใส่หน่วยนับ',
     needProduct:        'กรุณาเลือกชนิดน้ำยา',
+    needPickFromList:   'ยังไม่ได้เลือกชนิด — แตะเลือกจากรายการที่ค้นเจอก่อน (พิมพ์อย่างเดียวยังไม่นับ)',
     failed:             'รับเข้าไม่สำเร็จ',
     savingBtn:          '⏳ กำลังบันทึก… (ใช้เวลาหลายวินาที)',   // [T-070] แทนที่ text ปุ่มระหว่างรอ server
     okTpl:              '✅ รับเข้า {n} ชิ้น สำเร็จ',
@@ -225,6 +231,8 @@ function tf(tpl, vars){ return String(tpl).replace(/\{(\w+)\}/g,(_,k)=>vars[k]!=
 function applyAppText(){
   document.querySelectorAll('[data-text]').forEach(el=>{ const v=t(el.getAttribute('data-text')); if(typeof v==='string') el.textContent=v; });
   document.querySelectorAll('[data-text-placeholder]').forEach(el=>{ const v=t(el.getAttribute('data-text-placeholder')); if(typeof v==='string') el.placeholder=v; });
+  // [T-075] ปุ่มไอคอนที่ไม่มีข้อความในตัว — ชื่อสำหรับ screen reader ต้องมาจาก APP_TEXT ที่เดียวเหมือนกัน
+  document.querySelectorAll('[data-text-aria]').forEach(el=>{ const v=t(el.getAttribute('data-text-aria')); if(typeof v==='string') el.setAttribute('aria-label',v); });
   if(APP_TEXT.app.title) document.title=APP_TEXT.app.title;
 }
 
