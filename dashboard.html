@@ -551,10 +551,22 @@
 const API_URL = 'https://script.google.com/macros/s/AKfycbxpmNPzFf3s4CGMdXlEUpk_b0L6tkYxEg8sSYl7TR5yVCT16w5yCH2CXDPogF-DpjJZ/exec';
 const IS_DEMO  = /[?&]demo(=|&|$)/.test(location.search);
 
+// [T-080] เพดานเวลาเดียวกับ api.js (API_TIMEOUT_GET) — เน็ตหลุดกลางคันแล้ว fetch ไม่จบ = ค้าง "กำลังโหลด" ตลอดกาล
+//   หน้านี้ไม่ได้โหลด api.js (มี demo/ข้อมูลของตัวเอง) เลยเขียนแยก — หน้านี้อ่านอย่างเดียว ลองใหม่ได้เสมอ
+const API_TIMEOUT_GET = 30000;
 function apiGet(action, params) {
   if (IS_DEMO) return demoCall(action, params || {});
   const q = new URLSearchParams(Object.assign({ action }, params || {}));
-  return fetch(API_URL + '?' + q.toString()).then(r => r.json());
+  if (typeof AbortController === 'undefined') return fetch(API_URL + '?' + q.toString()).then(r => r.json());
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), API_TIMEOUT_GET);
+  return fetch(API_URL + '?' + q.toString(), { signal: ac.signal })
+    .then(r => r.json())
+    .catch(e => {
+      if (e && e.name === 'AbortError') throw new Error('หมดเวลารอ ' + (API_TIMEOUT_GET / 1000) + ' วินาที (เน็ตช้า/หลุด) — กด refresh เพื่อลองใหม่');
+      throw e;
+    })
+    .finally(() => clearTimeout(timer));
 }
 
 /* ──────────────────────────────

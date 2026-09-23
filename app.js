@@ -323,6 +323,7 @@ function renderProductDropdown(list){
   const sel=$('recvProductSel');
   // [T-075] combobox ใช้ list ชุดเดียวกับ select (select = ตัวเก็บค่าจริง / combo = หน้าบ้าน)
   comboItems = (list||[]).slice();
+  comboPinned = [];   // [T-077] โหลดลิสต์ใหม่ทั้งชุด = ป้าย "ตรงบาร์โค้ด" ของรอบก่อนหมดความหมาย
   if(!list||!list.length){ sel.innerHTML=`<option value="">${APP_TEXT.receive.noProducts}</option>`; comboSyncText(); return; }
   sel.innerHTML=`<option value="">${APP_TEXT.receive.pickProduct}</option>`+
     list.map(p=>`<option value="${esc(p.product_id)}">${esc(p.name)} (${esc(p.unit_of_measure)})</option>`).join('');
@@ -343,27 +344,60 @@ let comboActive = -1;   // index ใน comboFiltered ที่ไฮไลต�
 // pid ที่เลือกไว้ "ก่อนเริ่มพิมพ์" — ปิดลิสต์โดยไม่เลือกอะไร = คืนค่านี้กลับ
 // (เผลอพิมพ์แล้วแตะที่อื่น ไม่ควรทำให้ชนิดที่เลือกไว้หายจนต้องเริ่มใหม่)
 let comboLastPid = '';
+// [T-077] product_id ที่สแกน vendor barcode เจอ "หลายชนิด" — ลอยบนสุด + มีป้าย แต่ยังค้นชนิดอื่นได้ครบ
+//   (เดิมทับ comboItems ด้วยชุดที่สแกนเจอ → ค้นตัวอื่นไม่ได้จนกว่า reset และไม่มีอะไรบอกว่าถูกกรอง)
+let comboPinned = [];
 
 const _comboEl = () => ({ inp: $('recvProductInput'), list: $('recvProductList'), sel: $('recvProductSel'), clr: $('recvProductClear') });
 
+// คำค้น → รายการคำ (ตัวพิมพ์เล็ก) · ใช้ร่วมกันระหว่างค้น (comboMatch) กับไฮไลต์ (comboHl) ให้ตรงกันเสมอ
+const comboTokens = q => String(q || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+
 // ไฮไลต์คำค้นแบบปลอดภัย: esc() ทีละท่อนแล้วค่อยประกบ <mark> (ห้าม esc ทีหลัง — tag จะโดน escape ไปด้วย)
+// [T-078] หลายคำ ("bili 44") ไฮไลต์ครบทุกคำ — เดิมหาข้อความทั้งก้อน เลยไม่ไฮไลต์อะไรเลย
 function comboHl(text, q){
   const s = String(text == null ? '' : text);
-  if(!q) return esc(s);
-  const i = s.toLowerCase().indexOf(q.toLowerCase());
-  if(i < 0) return esc(s);
-  return esc(s.slice(0, i)) + '<mark>' + esc(s.slice(i, i + q.length)) + '</mark>' + esc(s.slice(i + q.length));
+  const tokens = comboTokens(q);
+  const low = s.toLowerCase();
+  // ความยาวเปลี่ยนหลัง lower (อักษรพิเศษบางตัว) = ตำแหน่งเพี้ยน → ไม่ไฮไลต์ดีกว่าไฮไลต์ผิดที่
+  if(!tokens.length || low.length !== s.length) return esc(s);
+  const hit = new Array(s.length).fill(false);
+  tokens.forEach(tk => {
+    for(let i = low.indexOf(tk); i >= 0; i = low.indexOf(tk, i + 1)) hit.fill(true, i, i + tk.length);
+  });
+  let out = '';
+  for(let i = 0; i < s.length; ){
+    let j = i;
+    while(j < s.length && hit[j] === hit[i]) j++;
+    out += hit[i] ? '<mark>' + esc(s.slice(i, j)) + '</mark>' : esc(s.slice(i, j));
+    i = j;
+  }
+  return out;
 }
 
 // ค้นจาก ชื่อ + รหัส + หน่วยนับ + barcode ผู้ขาย · หลายคำ = ต้องเจอครบทุกคำ (พิมพ์ "bili 45" ก็เจอ)
 function comboMatch(list, q){
-  const tokens = String(q || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const tokens = comboTokens(q);
   if(!tokens.length) return list.slice();
   return list.filter(p => {
     const hay = (String(p.name||'') + ' ' + String(p.product_id||'') + ' ' +
                  String(p.unit_of_measure||'') + ' ' + String(p.vendor_barcode||'')).toLowerCase();
     return tokens.every(tk => hay.indexOf(tk) >= 0);
   });
+}
+
+// [T-077] ผลค้นจากลิสต์เต็ม แต่ชนิดที่สแกนเจอ (comboPinned) ลอยขึ้นบนสุด
+function comboFilter(q){
+  const m = comboMatch(comboItems, q);
+  if(!comboPinned.length) return m;
+  const pinned = p => comboPinned.indexOf(p.product_id) >= 0;
+  return m.filter(pinned).concat(m.filter(p => !pinned(p)));
+}
+
+// ข้อความที่ใช้กรอง: ช่องโชว์ชื่อที่เลือกไว้แล้ว = ยังไม่ได้ค้นอะไร → '' (เห็นทั้งหมด)
+function comboQuery(){
+  const { inp, sel } = _comboEl();
+  return sel.value ? '' : inp.value.trim();
 }
 
 function comboRender(q){
@@ -376,21 +410,26 @@ function comboRender(q){
   list.innerHTML = comboFiltered.map((p, i) => `
     <div class="combo-opt${i === comboActive ? ' active' : ''}" role="option" id="combo-opt-${i}"
          aria-selected="${i === comboActive}" data-idx="${i}" onclick="comboPick(${i})">
-      <span class="co-name">${comboHl(p.name, q)}${p.unit_of_measure ? ' <span class="co-id">(' + esc(p.unit_of_measure) + ')</span>' : ''}</span>
+      <span class="co-name">${comboPinned.indexOf(p.product_id) >= 0 ? '<span class="co-pin">' + esc(APP_TEXT.receive.comboPinnedTag) + '</span> ' : ''}${comboHl(p.name, q)}${p.unit_of_measure ? ' <span class="co-id">(' + esc(p.unit_of_measure) + ')</span>' : ''}</span>
       <span class="co-id">${comboHl(p.product_id, q)}</span>
     </div>`).join('');
 }
 
-function comboOpen(){
+// วาดลิสต์ + เปิด (ใช้ร่วม comboOpen / comboInput)
+function comboShow(q){
   const { inp, list, clr } = _comboEl();
-  const q = inp.value.trim();
-  // ข้อความในช่อง = ชื่อที่เลือกไว้แล้ว → เปิดมาให้เห็นทั้งหมด (ไม่ใช่กรองเหลือตัวเดียว)
-  comboFiltered = comboMatch(comboItems, _comboEl().sel.value ? '' : q);
-  comboActive = -1;
-  comboRender(_comboEl().sel.value ? '' : q);
+  comboRender(q);
   list.classList.remove('hidden');
   inp.setAttribute('aria-expanded', 'true');
   clr.classList.toggle('hidden', !inp.value);
+}
+
+function comboOpen(){
+  // ข้อความในช่อง = ชื่อที่เลือกไว้แล้ว → เปิดมาให้เห็นทั้งหมด (ไม่ใช่กรองเหลือตัวเดียว)
+  const q = comboQuery();
+  comboFiltered = comboFilter(q);
+  comboActive = -1;
+  comboShow(q);
 }
 
 function comboClose(){
@@ -436,6 +475,7 @@ function comboClear(){
   const { inp, sel } = _comboEl();
   sel.value = '';
   comboLastPid = '';             // กดล้างเอง = ตั้งใจยกเลิกจริง ไม่ต้องคืนค่าเดิม
+  comboPinned = [];              // [T-077] เริ่มใหม่ = ทิ้งป้าย "ตรงบาร์โค้ด" ด้วย
   inp.value = '';
   renderLabelSample();
   comboOpen();
@@ -443,18 +483,15 @@ function comboClear(){
 }
 
 function comboInput(){
-  const { inp, sel, clr } = _comboEl();
+  const { inp, sel } = _comboEl();
   if(sel.value) comboLastPid = sel.value;   // จำไว้ก่อน เผื่อผู้ใช้เปลี่ยนใจแล้วแตะออก
   // เริ่มพิมพ์ = ยกเลิกตัวที่เลือกไว้ทันที · ห้ามคาไว้เด็ดขาด ไม่งั้นข้อความที่เห็นกับชนิดที่จะรับเข้า
   // ไม่ตรงกัน = รับเข้าผิดชนิดแบบเงียบ ๆ (ปัญหาเดียวกับที่ทำให้ไม่ใช้ <datalist>)
   sel.value = '';
   const q = inp.value.trim();
-  comboFiltered = comboMatch(comboItems, q);
+  comboFiltered = comboFilter(q);
   comboActive = comboFiltered.length === 1 ? 0 : -1;   // เหลือตัวเดียว = พร้อมกด Enter ได้เลย
-  comboRender(q);
-  _comboEl().list.classList.remove('hidden');
-  inp.setAttribute('aria-expanded', 'true');
-  clr.classList.toggle('hidden', !inp.value);
+  comboShow(q);
   renderLabelSample();
 }
 
@@ -468,7 +505,7 @@ function comboKey(e){
     comboActive = e.key === 'ArrowDown'
       ? (comboActive + 1) % comboFiltered.length
       : (comboActive <= 0 ? comboFiltered.length - 1 : comboActive - 1);
-    comboRender(_comboEl().sel.value ? '' : _comboEl().inp.value.trim());
+    comboRender(comboQuery());
     const el = $('combo-opt-' + comboActive);
     if(el){ el.scrollIntoView({block:'nearest'}); _comboEl().inp.setAttribute('aria-activedescendant', el.id); }
   } else if(e.key === 'Enter'){
@@ -492,6 +529,7 @@ function scanVendorBarcode(){
       if(seq!==vendorLookupSeq) return;   // มี request ใหม่กว่าแล้ว — ทิ้งผลรอบนี้
       if(!res||!res.ok){ toast(res.error||APP_TEXT.receive.searchFail,false); return; }
       $('recvVbcInput').value='';
+      comboPinned=[];   // [T-077] ผลสแกนรอบใหม่ = ป้ายของรอบก่อนหมดความหมาย
       if(res.products.length===0){
         toast(APP_TEXT.receive.notFound,false);
         showNewProductForm(bc);
@@ -499,27 +537,39 @@ function scanVendorBarcode(){
         selectProduct(res.products[0]);
         toast(tf(APP_TEXT.receive.foundTpl,{name:res.products[0].name}));
       } else {
-        renderProductDropdown(res.products);
+        comboPinScan(res.products);
         toast(tf(APP_TEXT.receive.foundManyTpl,{n:res.products.length}));
       }
     })
     .catch(e=>{ if(seq!==vendorLookupSeq) return; toast(tf(APP_TEXT.receive.searchFailTpl,{msg:e.message}),false); });
 }
 
-function selectProduct(prod){
+// ชนิดที่ยังไม่อยู่ในลิสต์ (เช่นเครื่องอื่นเพิ่งสร้าง) → เติมทั้ง select และ comboItems คู่กันเสมอ
+//   เติมแค่ select = comboSyncText หาชื่อไม่เจอ → ช่องว่างทั้งที่ select มี pid = ผิด invariant (T-076)
+function recvEnsureProduct(prod){
   const sel=$('recvProductSel');
-  let found=false;
-  for(let i=0;i<sel.options.length;i++){
-    if(sel.options[i].value===prod.product_id){ sel.selectedIndex=i; found=true; break; }
-  }
-  if(!found){
+  if(![...sel.options].some(o=>o.value===prod.product_id)){
     const opt=document.createElement('option');
     opt.value=prod.product_id; opt.textContent=prod.name+' ('+prod.unit_of_measure+')';
-    sel.appendChild(opt); sel.value=prod.product_id;
-    // [T-075] ชนิดที่ยังไม่อยู่ในลิสต์ (เช่นเครื่องอื่นเพิ่งสร้าง) ต้องเข้า comboItems ด้วย
-    //   ไม่งั้น comboSyncText หาชื่อไม่เจอ → ช่องว่างทั้งที่ select มี pid = ผิด invariant
-    if(!comboItems.some(p=>p.product_id===prod.product_id)) comboItems.push(prod);
+    sel.appendChild(opt);
   }
+  if(!comboItems.some(p=>p.product_id===prod.product_id)) comboItems.push(prod);
+}
+
+// [T-077] สแกนเจอหลายชนิด: ไม่เลือกให้ (เดาไม่ได้ว่าตัวไหน) แต่เปิดลิสต์ให้ชนิดที่ตรงลอยบนสุด
+function comboPinScan(list){
+  list.forEach(recvEnsureProduct);
+  comboPinned=list.map(p=>p.product_id);
+  $('recvProductSel').value=''; comboLastPid='';
+  hideNewProductForm();
+  comboSyncText();
+  renderLabelSample();
+  comboOpen();       // ไม่ focus ช่อง — กันคีย์บอร์ดมือถือเด้งบังลิสต์
+}
+
+function selectProduct(prod){
+  recvEnsureProduct(prod);
+  $('recvProductSel').value=prod.product_id;
   hideNewProductForm();
   comboSyncText();       // [T-075] สแกน vendor barcode เจอ → ช่องค้นหาต้องโชว์ชื่อที่เลือกด้วย
   renderLabelSample();   // [T-033]
@@ -980,7 +1030,9 @@ function admPurgeProduct(){
       // ไม่มีล็อต/กล่องเลย → ปุ่มลบถาวรเดิมทำงานได้ ไม่ต้องใช้ทางที่แรงกว่า
       if(!c.lots && !c.units){ toast(APP_TEXT.admin.purgeNothing,false); return; }
       admAsk('purge', tf(APP_TEXT.admin.confirmPurgeTpl,{
-        name:esc(p.name), lots:c.lots, units:c.units, inStock:c.in_stock, voided:c.void, reason:esc(reason)
+        name:esc(p.name), lots:c.lots, units:c.units, inStock:c.in_stock, voided:c.void, reason:esc(reason),
+        // [T-079] สถานะอื่น (แก้ชีตมือ) ก็โดนลบด้วย → ต้องบอกให้ครบ ไม่ลบเงียบ
+        otherPart:c.other ? tf(APP_TEXT.admin.purgeOtherTpl,{n:c.other}) : ''
       }), {product_id:p.product_id, reason, confirm:'PURGE', _name:p.name});
     })
     .catch(e=>{ busy=false; $('admPurgeBtn').disabled=false; toast(tf(APP_TEXT.common.errorTpl,{msg:e.message}),false); });
@@ -1015,6 +1067,8 @@ function admConfirmYes(){
   else { done(); return; }
   req.then(res=>{
       done();
+      // [T-079] purge ค้างครึ่งทาง = ข้อมูลเปลี่ยนไปแล้วบางส่วน → ปิดกล่อง + โหลดลิสต์ใหม่ให้เห็นของที่เหลือจริง
+      if(res && res.partial){ toast(res.error,false); adminCancelConfirm(); admRefreshAfterChange(); return; }
       if(!res||!res.ok){ toast(tf(APP_TEXT.admin.failTpl,{msg:(res&&res.error)||APP_TEXT.common.loadFail}),false); return; }
       if(type==='void'){ toast(tf(APP_TEXT.admin.voidOkTpl,{code:payload.unit_barcode})); $('admVoidBc').value=''; $('admVoidReason').value=''; }
       if(type==='unissue'){ toast(tf(APP_TEXT.admin.unissueOkTpl,{code:payload.unit_barcode})); $('admUnissueBc').value=''; $('admUnissueReason').value=''; }

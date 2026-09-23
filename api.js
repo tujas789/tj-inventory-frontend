@@ -47,11 +47,6 @@ const API_TIMEOUT_POST = 60000;
    รอบสองจะชนสถานะที่เปลี่ยนไปแล้วแล้ว error เอง (เช่น "กล่องนี้ถูกเบิกไปแล้ว") ไม่เกิดของซ้ำ */
 const REPEAT_UNSAFE = { receive:1, receiveForUI:1, createLot:1, createProduct:1 };
 
-const _t = (key, fallback) => {
-  try { return (APP_TEXT && APP_TEXT.common && APP_TEXT.common[key]) || fallback; }
-  catch(e){ return fallback; }
-};
-
 // fetch + เพดานเวลา · AbortError → ข้อความที่บอก "ต้องทำอะไรต่อ" ไม่ใช่แค่ "ล้มเหลว"
 function _fetchTimeout(url, opts, ms, action){
   // AbortController มีทุกเบราว์เซอร์ที่ระบบรองรับ (iOS 12.2+/Chrome 66+) — ไม่มีก็ยังทำงานได้แค่ไม่มี timeout
@@ -63,9 +58,8 @@ function _fetchTimeout(url, opts, ms, action){
     .catch(e=>{
       if(e && e.name==='AbortError'){
         const sec=Math.max(1, Math.round(ms/1000));   // กันปัดลงเหลือ 0 ตอนตั้งค่าสั้นๆ (เช่นตอนเทส)
-        throw new Error(REPEAT_UNSAFE[action]
-          ? tf(_t('timeoutUnsafeTpl','หมดเวลารอ {sec} วินาที — ⚠️ อย่าเพิ่งกดซ้ำ! ระบบอาจบันทึกไปแล้ว กรุณาเช็คหน้าสต๊อกก่อน'),{sec})
-          : tf(_t('timeoutTpl','หมดเวลารอ {sec} วินาที (เน็ตช้า/หลุด) — ลองใหม่อีกครั้งได้'),{sec}));
+        // ข้อความมีที่เดียวคือ APP_TEXT.common (app-text.js โหลดก่อน api.js เสมอ — tf ก็มาจากไฟล์นั้น)
+        throw new Error(tf(REPEAT_UNSAFE[action] ? APP_TEXT.common.timeoutUnsafeTpl : APP_TEXT.common.timeoutTpl, {sec}));
       }
       throw e;
     })
@@ -252,12 +246,13 @@ const DEMO = (function(){
       if(!dryRun && !String(p.reason||'').trim()) return {ok:false, error:'ต้องระบุเหตุผล — จะถูกบันทึกลงประวัติ (Transaction)'};
       if(!prod) return {ok:false, error:'ไม่พบชนิดนี้ในระบบ: '+pid};
       const myLots=lots.filter(l=>l.product_id===pid);
-      const lotIds=myLots.map(l=>l.lot_id);
+      const lotIds=myLots.map(l=>l.lot_id).filter(Boolean);   // [T-076] lot_id ว่างห้ามจับคู่ (backend เดียวกัน)
       const myUnits=units.filter(u=>u.product_id===pid || lotIds.indexOf(u.lot_id)>=0);
       const counts={lots:myLots.length, units:myUnits.length,
         in_stock:myUnits.filter(u=>u.status==='in_stock').length,
         issued:myUnits.filter(u=>u.status==='issued').length,
         void:myUnits.filter(u=>u.status==='void').length};
+      counts.other=counts.units-counts.in_stock-counts.issued-counts.void;   // [T-079]
       if(counts.issued>0) return {ok:false, error:'ชนิดนี้เคยถูกเบิกไปแล้ว '+counts.issued+' กล่อง — ลบไม่ได้ (ประวัติการเบิกต้องอยู่ครบ) · ใช้ "ปิดใช้งาน" แทน'};
       if(dryRun) return {ok:true, dryRun:true, product_id:pid, name:prod.name, counts};
       for(let i=units.length-1;i>=0;i--) if(myUnits.indexOf(units[i])>=0) units.splice(i,1);

@@ -184,6 +184,8 @@
   /* รหัส P00xx = ตัวแยกชนิดชื่อซ้ำ — mono ให้อ่านเทียบง่าย */
   .combo-opt .co-id{ font-family:var(--mono); font-size:12px; color:var(--mut); white-space:nowrap; }
   .combo-opt mark{ background:rgba(204,120,92,.22); color:inherit; border-radius:2px; padding:0 1px; }
+  .combo-opt .co-pin{ display:inline-block; font-size:11px; font-weight:700; color:var(--coral);   /* [T-077] ป้าย "ตรงบาร์โค้ด" */
+                      background:rgba(204,120,92,.14); border-radius:999px; padding:1px 7px; vertical-align:1px; }
   .combo-empty{ padding:16px 14px; text-align:center; color:var(--mut); font-size:14px; }
 
   .hidden{ display:none !important; }   /* !important: กัน #login{display:flex} ชนะ class นี้ */

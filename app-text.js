@@ -82,7 +82,7 @@ const APP_TEXT = {
     comboPlaceholder:   'พิมพ์ชื่อ/รหัส เพื่อค้นหา — หรือแตะเพื่อดูทั้งหมด',
     comboClearAria:     'ล้างการเลือก',
     comboEmptyTpl:      'ไม่พบ "{q}" — ถ้าเป็นของใหม่ กด ➕ สร้างชนิดใหม่ ด้านล่าง',
-    comboCountTpl:      'พบ {n} ชนิด',
+    comboPinnedTag:     '📦 ตรงบาร์โค้ด',     // [T-077] ป้ายชนิดที่สแกนเจอ (ลอยบนสุดของลิสต์)
     loadingProducts:    '— กำลังโหลด... —',
     noProducts:         '— ยังไม่มีชนิดน้ำยา —',
     pickProduct:        '— เลือกชนิด —',
@@ -206,8 +206,9 @@ const APP_TEXT = {
     confirmActivateTpl: 'เปิดใช้งาน <b>{name}</b> กลับมาใช้ตามปกติ',
     confirmDeleteTpl:   '⚠️ ลบ <b>{name}</b> ถาวร — กู้คืนไม่ได้',
     confirmPurgeTpl:    '⚠️ ล้าง <b>{name}</b> ทั้งหมด — <b>กู้คืนไม่ได้</b><br>'+
-                        'จะลบ: ล็อต <b>{lots}</b> · กล่อง <b>{units}</b> (อยู่ในสต๊อก {inStock} · ยกเลิกแล้ว {voided})<br>'+
+                        'จะลบ: ล็อต <b>{lots}</b> · กล่อง <b>{units}</b> (อยู่ในสต๊อก {inStock} · ยกเลิกแล้ว {voided}{otherPart})<br>'+
                         'เหตุผล: {reason}<br><span class="muted">ฉลากที่ปริ้นไปแล้วของชนิดนี้จะยิงไม่เจอ — ทิ้งได้เลย</span>',
+    purgeOtherTpl:      ' · <b>สถานะอื่น {n}</b>',   // [T-079] ต่อท้ายใน confirmPurgeTpl เฉพาะตอนมี
     purgeOkTpl:         '✅ ล้าง {name} แล้ว (ล็อต {lots} · กล่อง {units})',
     voidOkTpl:          '✅ ยกเลิกกล่อง {code} แล้ว',
     unissueOkTpl:       '✅ คืนสต๊อก {code} แล้ว',
