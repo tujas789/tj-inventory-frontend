@@ -406,7 +406,9 @@ function comboClose(){
 function comboSyncText(){
   const { inp, sel, clr } = _comboEl();
   const p = comboItems.find(x => x.product_id === sel.value);
-  inp.value = p ? p.name + (p.unit_of_measure ? ' (' + p.unit_of_measure + ')' : '') : '';
+  // หาใน comboItems ไม่เจอแต่ select มีค่า → ใช้ข้อความ option แทน (ห้ามปล่อยช่องว่างขณะที่ select มี pid)
+  const opt = sel.value && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+  inp.value = p ? p.name + (p.unit_of_measure ? ' (' + p.unit_of_measure + ')' : '') : (opt ? opt.textContent : '');
   clr.classList.toggle('hidden', !inp.value);
 }
 
@@ -514,6 +516,9 @@ function selectProduct(prod){
     const opt=document.createElement('option');
     opt.value=prod.product_id; opt.textContent=prod.name+' ('+prod.unit_of_measure+')';
     sel.appendChild(opt); sel.value=prod.product_id;
+    // [T-075] ชนิดที่ยังไม่อยู่ในลิสต์ (เช่นเครื่องอื่นเพิ่งสร้าง) ต้องเข้า comboItems ด้วย
+    //   ไม่งั้น comboSyncText หาชื่อไม่เจอ → ช่องว่างทั้งที่ select มี pid = ผิด invariant
+    if(!comboItems.some(p=>p.product_id===prod.product_id)) comboItems.push(prod);
   }
   hideNewProductForm();
   comboSyncText();       // [T-075] สแกน vendor barcode เจอ → ช่องค้นหาต้องโชว์ชื่อที่เลือกด้วย
